@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: talentlink
+      POSTGRES_USER: talentlink
+      POSTGRES_PASSWORD: talentlink123
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DEBUG: 'True'
+      DATABASE_URL: postgresql://talentlink:talentlink123@db:5432/talentlink
+      SECRET_KEY: your-secret-key-change-in-production
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
+
+volumes:
+  postgres_data:

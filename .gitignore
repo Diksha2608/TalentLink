@@ -1,0 +1,39 @@
+# ===== Python & Django =====
+__pycache__/
+*.py[cod]
+*.class
+
+# ===== Virtual Environments =====
+venv/
+venv*/
+backend/venv/
+backend/venv312/
+env/
+ENV/
+.venv/
+env.bak/
+venv.bak/
+
+# ===== Django specific =====
+*.log
+db.sqlite3
+media/
+staticfiles/
+.env
+
+# ===== Node / React =====
+node_modules/
+dist/
+build/
+dist-ssr/
+*.local
+*.lock
+
+# ===== OS / IDE =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
