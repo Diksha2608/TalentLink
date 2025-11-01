@@ -1,13 +1,15 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, permissions, parsers, response, status
+
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
-from .models import FreelancerProfile, Skill
+from django.utils.text import slugify
+from .models import FreelancerProfile, Skill, ClientProfile,PortfolioFile
 from .serializers import (
     UserSerializer, FreelancerProfileSerializer, UserRegistrationSerializer, 
-    SkillSerializer, EmailTokenObtainSerializer
+    SkillSerializer, EmailTokenObtainSerializer, ClientProfileSerializer, PortfolioFileSerializer
 )
 
 User = get_user_model()
@@ -19,6 +21,8 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+   
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
@@ -36,7 +40,7 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['put'])
+    @action(detail=False, methods=['put', 'patch'])
     def update_me(self, request):
         user = request.user
         serializer = self.get_serializer(user, data=request.data, partial=True)
@@ -61,8 +65,9 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
     queryset = FreelancerProfile.objects.all()
     serializer_class = FreelancerProfileSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
-    @action(detail=False, methods=['get', 'put'])
+    @action(detail=False, methods=['get', 'put', 'patch'])
     def me(self, request):
         try:
             profile = request.user.freelancer_profile
@@ -72,7 +77,7 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        if request.method == 'PUT':
+        if request.method in ['PUT', 'PATCH']:
             serializer = self.get_serializer(profile, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -81,8 +86,178 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(profile)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], url_path='me/upload-portfolio-files')
+    def upload_portfolio_files(self, request):
+        """
+        Upload multiple portfolio files (max 5 total)
+        Accepts files as: portfolio_file_0, portfolio_file_1, etc.
+        """
+        try:
+            profile = request.user.freelancer_profile
+        except FreelancerProfile.DoesNotExist:
+            return Response(
+                {'detail': 'Freelancer profile not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check current file count
+        current_count = profile.portfolio_files.count()
+        if current_count >= 5:
+            return Response(
+                {'detail': 'Maximum 5 portfolio files allowed. Please delete some files first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        uploaded_files = []
+        errors = []
+        
+        # Process files from request
+        for key in request.FILES:
+            if current_count + len(uploaded_files) >= 5:
+                errors.append(f'Skipping {key}: Maximum 5 files limit reached')
+                continue
+            
+            file = request.FILES[key]
+            
+            # Validate file size (10MB limit)
+            if file.size > 10 * 1024 * 1024:
+                errors.append(f'{file.name}: File size exceeds 10MB')
+                continue
+            
+            # Create portfolio file
+            portfolio_file = PortfolioFile.objects.create(
+                freelancer_profile=profile,
+                file=file,
+                file_name=file.name,
+                file_size=file.size
+            )
+            uploaded_files.append(portfolio_file)
+        
+        if not uploaded_files and errors:
+            return Response(
+                {'detail': 'No files uploaded', 'errors': errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = PortfolioFileSerializer(
+            uploaded_files, 
+            many=True, 
+            context={'request': request}
+        )
+        
+        response_data = {
+            'uploaded': serializer.data,
+            'count': len(uploaded_files)
+        }
+        
+        if errors:
+            response_data['warnings'] = errors
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['delete'], url_path='me/delete-portfolio-file/(?P<file_id>[^/.]+)')
+    def delete_portfolio_file(self, request, file_id=None):
+        """Delete a specific portfolio file"""
+        try:
+            profile = request.user.freelancer_profile
+            portfolio_file = PortfolioFile.objects.get(
+                id=file_id, 
+                freelancer_profile=profile
+            )
+            portfolio_file.file.delete()  # Delete actual file
+            portfolio_file.delete()  # Delete database record
+            return Response(
+                {'detail': 'File deleted successfully'},
+                status=status.HTTP_200_OK
+            )
+        except PortfolioFile.DoesNotExist:
+            return Response(
+                {'detail': 'File not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+class ClientProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = ClientProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+    http_method_names = ['get', 'put', 'patch', 'head', 'options']
 
+    def get_queryset(self):
+        # Only my profile
+        return ClientProfile.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['get', 'put', 'patch'], url_path='me')
+    def me(self, request, *args, **kwargs):
+        obj = ClientProfile.objects.get(user=request.user)
+        if request.method.lower() == 'get':
+            return response.Response(self.get_serializer(obj).data)
+        serializer = self.get_serializer(obj, data=request.data, partial=(request.method.lower() == 'patch'))
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
+
+    def list(self, request, *args, **kwargs):
+        return self.me(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        return self.me(request, *args, **kwargs)
+    
 class SkillViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Skill.objects.all()
     serializer_class = SkillSerializer
     permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        queryset = Skill.objects.all()
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(name__icontains=search)
+        return queryset.order_by('name')
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def create_custom(self, request):
+        """Allow users to create custom skills if they don't exist"""
+        skill_name = request.data.get('name', '').strip()
+        
+        if not skill_name:
+            return Response(
+                {'detail': 'Skill name is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(skill_name) < 2:
+            return Response(
+                {'detail': 'Skill name must be at least 2 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if len(skill_name) > 50:
+            return Response(
+                {'detail': 'Skill name must be less than 50 characters.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        existing_skill = Skill.objects.filter(name__iexact=skill_name).first()
+        if existing_skill:
+            return Response(
+                SkillSerializer(existing_skill).data,
+                status=status.HTTP_200_OK
+            )
+        
+        # Create new skill
+        slug = slugify(skill_name)
+        
+        # Ensure unique slug
+        base_slug = slug
+        counter = 1
+        while Skill.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        skill = Skill.objects.create(name=skill_name, slug=slug)
+        
+        return Response(
+            SkillSerializer(skill).data,
+            status=status.HTTP_201_CREATED
+        )

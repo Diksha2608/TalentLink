@@ -1,13 +1,15 @@
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
-from .models import FreelancerProfile, Skill
+from .models import FreelancerProfile, Skill, ClientProfile, PortfolioFile
+
 
 User = get_user_model()
 
 class EmailTokenObtainSerializer(TokenObtainPairSerializer):
-    username_field = User.USERNAME_FIELD  # This is 'username' by default
+    username_field = User.USERNAME_FIELD 
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -68,7 +70,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'role', 'avatar', 'bio', 'location', 'rating_avg', 'created_at', 'profile_complete']
+        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'role', 'avatar', 'bio', 'location', 'phone','birthdate', 'rating_avg', 'created_at', 'profile_complete']
         read_only_fields = ['id', 'created_at', 'rating_avg']
 
     def get_profile_complete(self, obj):
@@ -84,6 +86,21 @@ class UserSerializer(serializers.ModelSerializer):
                 return False
         return True
 
+class PortfolioFileSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PortfolioFile
+        fields = ['id', 'file', 'file_name', 'file_size', 'file_url', 'uploaded_at']
+        read_only_fields = ['id', 'uploaded_at', 'file_url']
+    
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file:
+            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+        return None
+
+
 class FreelancerProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     skills = SkillSerializer(many=True, read_only=True)
@@ -94,15 +111,45 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
         source='skills',
         required=False
     )
+    portfolio_files = PortfolioFileSerializer(many=True, read_only=True)
 
     class Meta:
         model = FreelancerProfile
         fields = [
             'user', 'hourly_rate', 'skills', 'skill_ids', 'availability',
             'resume_file', 'portfolio', 'intro_video_url', 'social_links',
-            'total_earnings', 'projects_completed', 'created_at'
+            'total_earnings', 'projects_completed', 'created_at',
+            'category', 'custom_category', 'role_title', 'languages', 
+            'experiences', 'education', 'portfolio_files'
         ]
-        read_only_fields = ['created_at', 'total_earnings', 'projects_completed']
+        read_only_fields = ['created_at', 'total_earnings', 'projects_completed', 'portfolio_files']
+
+class ClientProfileMeSerializer(serializers.ModelSerializer):
+    id_document_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClientProfile
+        fields = (
+            "company_name", "company_website", "id_document",
+            "id_document_url", "is_verified", "verification_submitted_at",
+            "projects_posted", "active_projects"
+        )
+        read_only_fields = ("is_verified", "verification_submitted_at", "projects_posted", "active_projects")
+
+    def get_id_document_url(self, obj):
+        request = self.context.get('request')
+        if obj.id_document:
+            return request.build_absolute_uri(obj.id_document.url) if request else obj.id_document.url
+        return None
+
+    def update(self, instance, validated_data):
+        # Only stamp when id_document is explicitly provided
+        if 'id_document' in validated_data and validated_data['id_document'] is not None:
+            instance.verification_submitted_at = timezone.now()
+            instance.is_verified = False  # stays pending until admin approves
+        return super().update(instance, validated_data)
+
+ClientProfileSerializer = ClientProfileMeSerializer
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8, style={'input_type': 'password'})
@@ -135,8 +182,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         
-        # Auto-create freelancer profile with default values
+        # Auto-create profile based on role
         if user.role == 'freelancer':
             FreelancerProfile.objects.create(user=user, hourly_rate=0)
+        elif user.role == 'client':
+            ClientProfile.objects.create(user=user)
         
         return user

@@ -11,6 +11,7 @@ from projects.views import ProjectViewSet
 from proposals.views import ProposalViewSet
 from contracts.views import ContractViewSet, ReviewViewSet
 from messaging.views import MessageViewSet
+from users.views import ClientProfileViewSet  
 
 def api_root(request):
     return JsonResponse({
@@ -28,6 +29,7 @@ def api_root(request):
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
 router.register(r'profiles/freelancer', FreelancerProfileViewSet, basename='freelancer-profile')
+router.register(r'profiles/client', ClientProfileViewSet, basename='client-profile')
 router.register(r'skills', SkillViewSet, basename='skill')
 router.register(r'projects', ProjectViewSet, basename='project')
 router.register(r'proposals', ProposalViewSet, basename='proposal')

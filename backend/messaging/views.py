@@ -1,13 +1,13 @@
-# backend/messaging/views.py
-from django.shortcuts import render
-
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
-from .models import Message
-from .serializers import MessageSerializer
+from django.contrib.auth import get_user_model
+from .models import Message, Conversation
+from .serializers import MessageSerializer, ConversationSerializer
+
+User = get_user_model()
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
@@ -18,14 +18,41 @@ class MessageViewSet(viewsets.ModelViewSet):
         return Message.objects.filter(Q(sender=user) | Q(recipient=user))
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(sender=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        recipient_id = request.data.get('recipient')
+        content = request.data.get('content')
+        file_attachment = request.FILES.get('file_attachment')
+        
+        try:
+            recipient = User.objects.get(id=recipient_id)
+        except User.DoesNotExist:
+            return Response({'detail': 'Recipient not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get or create conversation
+        conversation = Conversation.objects.filter(
+            participants=request.user
+        ).filter(
+            participants=recipient
+        ).first()
+        
+        if not conversation:
+            conversation = Conversation.objects.create()
+            conversation.participants.add(request.user, recipient)
+        
+        # Create message
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            recipient=recipient,
+            content=content,
+            file_attachment=file_attachment
+        )
+        
+        serializer = self.get_serializer(message)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'])
     def conversations(self, request):
+        """Get all users the current user has conversations with"""
         user = request.user
         messages = self.get_queryset()
         users_in_conversation = set()
@@ -46,5 +73,27 @@ class MessageViewSet(viewsets.ModelViewSet):
             Q(sender_id=other_user_id, recipient=request.user) |
             Q(sender=request.user, recipient_id=other_user_id)
         ).order_by('created_at')
+        
+        # Mark messages as read
+        messages.filter(recipient=request.user, read=False).update(read=True)
+        
         serializer = self.get_serializer(messages, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def search_users(self, request):
+        """Search for users to message"""
+        query = request.query_params.get('q', '')
+        
+        if len(query) < 2:
+            return Response({'detail': 'Query too short. Minimum 2 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        users = User.objects.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query) |
+            Q(username__icontains=query)
+        ).exclude(id=request.user.id)[:20]  # Limit to 20 results
+        
+        from users.serializers import UserSerializer
+        return Response(UserSerializer(users, many=True).data)

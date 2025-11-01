@@ -18,10 +18,17 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { authAPI } from './api/auth';
 import PostProject from './pages/PostProject';
 import FreelancerProfile from './pages/FreelancerProfile';
+import ClientProfile from './pages/ClientProfile';
+import ContractDetail from './pages/ContractDetail';
+
 import './App.css';
 
 function App() {
-  const [user, setUser] = useState(null);
+
+  const [user, setUser] = useState(() => {
+    const cached = localStorage.getItem('user');
+    return cached ? JSON.parse(cached) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,10 +36,14 @@ function App() {
     if (token) {
       authAPI
         .me()
-        .then((res) => setUser(res.data))
+        .then((res) => {
+          setUser(res.data);
+          localStorage.setItem('user', JSON.stringify(res.data));
+        })
         .catch(() => {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
         })
         .finally(() => setLoading(false));
     } else {
@@ -43,11 +54,12 @@ function App() {
   if (loading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
+  {console.log('🧭 ROUTE:', window.location.pathname, 'USER:', user)}
 
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
-        <Navbar user={user} setUser={setUser} />
+        <Navbar user={user} setUser={setUser} loading={loading} />
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<Landing user={user} />} />
@@ -66,6 +78,8 @@ function App() {
               path="/dashboard/client"
               element={<ProtectedRoute user={user}><ClientDashboard user={user} /></ProtectedRoute>}
             />
+            <Route path="/contracts" element={<Contracts user={user} />} />
+            <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
             <Route
               path="/dashboard/freelancer"
               element={<ProtectedRoute user={user}><FreelancerDashboard user={user} /></ProtectedRoute>}
@@ -80,7 +94,18 @@ function App() {
             />
             <Route path="/test-api" element={<TestAPI />} />
             <Route path="/projects/create" element={<ProtectedRoute user={user}><PostProject user={user} /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute user={user}><FreelancerProfile user={user} setUser={setUser} /></ProtectedRoute>} />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute user={user}>
+                  {user?.role === 'freelancer' ? (
+                    <FreelancerProfile user={user} setUser={setUser} />
+                  ) : (
+                    <ClientProfile user={user} setUser={setUser} />
+                  )}
+                </ProtectedRoute>
+              } 
+            />
             
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

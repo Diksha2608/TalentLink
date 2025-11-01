@@ -17,12 +17,6 @@ export default function PostProject({ user }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (user && user.role === 'freelancer') {
-      navigate('/dashboard/freelancer');
-    }
-  }, [user, navigate]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -50,7 +44,6 @@ export default function PostProject({ user }) {
         budget_max: formData.budget_max,
         duration_estimate: formData.duration_estimate,
         visibility: formData.visibility,
-        status: 'open',
       };
 
       await projectsAPI.create(projectData);
@@ -63,7 +56,11 @@ export default function PostProject({ user }) {
     }
   };
 
-  if (!user) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const token = localStorage.getItem('access_token');
+
+  if (!mounted || (!user && !token)) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-lg">Loading...</div>
@@ -71,8 +68,21 @@ export default function PostProject({ user }) {
     );
   }
 
+
   if (user.role === 'freelancer') {
-    return null;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">This page is for clients only</h2>
+          <button
+            onClick={() => navigate('/dashboard/freelancer')}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -27,7 +27,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save(client=self.request.user)
+        serializer.save(client=self.request.user, status='open')
 
     @action(detail=True, methods=['get'])
     def proposals(self, request, pk=None):

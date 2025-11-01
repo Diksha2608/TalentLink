@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { useState, useRef } from 'react';
 
-export default function Navbar({ user, setUser }) {
+export default function Navbar({ user, setUser, loading }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [barStyle, setBarStyle] = useState({ left: 0, width: 0, opacity: 0 });
   const containerRef = useRef(null);
@@ -11,10 +11,21 @@ export default function Navbar({ user, setUser }) {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
     setUser(null);
     navigate('/');
   };
 
+  if (loading) {
+    return (
+      <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <span className="text-2xl font-bold text-purple-600">TalentLink</span>
+          <div className="text-gray-500 text-sm">Loading...</div>
+        </div>
+      </nav>
+    );
+  }
   const navItems = user
     ? [
         { to: '/projects', label: 'Browse Projects' },
@@ -79,7 +90,6 @@ export default function Navbar({ user, setUser }) {
               </div>
             ))}
 
-            {/* ONE moving purple bar */}
             <span
               className="absolute bottom-0 h-[3px] bg-purple-600 rounded-full transition-all duration-300 ease-out pointer-events-none"
               style={barStyle}

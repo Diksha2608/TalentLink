@@ -22,24 +22,27 @@ export default function ClientDashboard({ user }) {
 
   const loadDashboardData = async () => {
     try {
+      // Get all projects
       const projectsRes = await projectsAPI.list();
       const allProjects = projectsRes.data.results || projectsRes.data;
       
-      setProjects(allProjects);
+      // Filter to show only current user's projects
+      const myProjects = allProjects.filter(p => p.client === user.id);
       
-      const totalProposals = allProjects.reduce((sum, p) => sum + (p.proposal_count || 0), 0);
+      setProjects(myProjects);
+      
+      const totalProposals = myProjects.reduce((sum, p) => sum + (p.proposal_count || 0), 0);
       
       setStats({
-        totalProjects: allProjects.length,
-        activeProjects: allProjects.filter((p) => p.status === 'open' || p.status === 'in_progress').length,
+        totalProjects: myProjects.length,
+        activeProjects: myProjects.filter((p) => p.status === 'open' || p.status === 'in_progress').length,
         totalProposals,
-        completedProjects: allProjects.filter((p) => p.status === 'completed').length,
+        completedProjects: myProjects.filter((p) => p.status === 'completed').length,
       });
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     }
   };
-
   const handleCreateProject = () => {
     navigate('/projects/create');
   };

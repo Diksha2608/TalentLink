@@ -6,9 +6,6 @@ console.log('🔗 API Client initialized with base URL:', API_BASE_URL);
 
 const client = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   timeout: 10000,
 });
 
@@ -19,6 +16,19 @@ client.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (config.data instanceof FormData) {
+   
+      if (config.headers && config.headers['Content-Type']) {
+        delete config.headers['Content-Type'];
+      }
+    } else {
+      config.headers = {
+        ...(config.headers || {}),
+        'Content-Type': 'application/json',
+      };
+    }
+
     console.log('📤 Request:', config.method?.toUpperCase(), config.url);
     return config;
   },

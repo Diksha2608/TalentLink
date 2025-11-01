@@ -1,10 +1,37 @@
+// api/auth.js
 import client from './client';
 
 export const authAPI = {
   register: (data) => client.post('/users/register/', data),
   login: (email, password) => client.post('/token/', { email, password }),
   me: () => client.get('/users/me/'),
+  
+  updateUser: (data) => {
+    if (data instanceof FormData) {
+      return client.put('/users/update_me/', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    }
+    return client.put('/users/update_me/', data);
+  },
+  
   updateProfile: (data) => client.put('/profiles/freelancer/me/', data),
-  updateUser: (data) => client.put('/users/update_me/', data),
+  
   getFreelancerProfile: () => client.get('/profiles/freelancer/me/'),
+  
+  getClientProfile: () => client.get('/profiles/client/me/'),
+  
+  updateClientProfile: (data) => client.put('/profiles/client/me/', data),
+  getMyProposals: () => client.get('/proposals/'),
+  getMyContracts: () => client.get('/contracts/'),
+
+  uploadPortfolioFiles: (formData) => {
+    return client.post('/profiles/freelancer/me/upload-portfolio-files/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  
+  deletePortfolioFile: (fileId) => {
+    return client.delete(`/profiles/freelancer/me/delete-portfolio-file/${fileId}/`);
+  },
 };

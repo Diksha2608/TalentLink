@@ -16,22 +16,92 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         self.stdout.write('Seeding database...')
 
-        # Create Skills
+        # Create Skills - EXPANDED LIST
         skills_data = [
-            'Python', 'JavaScript', 'React', 'Django', 'Node.js',
-            'TypeScript', 'Vue.js', 'Angular', 'PostgreSQL', 'MongoDB',
-            'UI/UX Design', 'Graphic Design', 'Content Writing', 'SEO',
-            'Digital Marketing', 'Data Science', 'Machine Learning', 'DevOps'
+            # Programming Languages
+            'Python', 'JavaScript', 'TypeScript', 'Java', 'C++', 'C#', 'PHP', 'Ruby', 'Go', 'Rust',
+            'Swift', 'Kotlin', 'Scala', 'R', 'MATLAB', 'Perl', 'Dart', 'Objective-C',
+            
+            # Web Development
+            'React', 'Angular', 'Vue.js', 'Node.js', 'Django', 'Flask', 'FastAPI', 'Express.js',
+            'Next.js', 'Nuxt.js', 'Svelte', 'jQuery', 'Bootstrap', 'Tailwind CSS', 'Material-UI',
+            'HTML5', 'CSS3', 'SASS', 'LESS', 'Webpack', 'Vite',
+            
+            # Backend & APIs
+            'REST API', 'GraphQL', 'gRPC', 'WebSockets', 'Microservices', 'Spring Boot',
+            'Laravel', 'Ruby on Rails', 'ASP.NET', '.NET Core',
+            
+            # Mobile Development
+            'React Native', 'Flutter', 'iOS Development', 'Android Development', 'Xamarin',
+            'Ionic', 'Cordova', 'SwiftUI',
+            
+            # Databases
+            'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Elasticsearch', 'Cassandra',
+            'Oracle', 'SQL Server', 'SQLite', 'Firebase', 'DynamoDB', 'Neo4j',
+            
+            # Cloud & DevOps
+            'AWS', 'Azure', 'Google Cloud', 'Docker', 'Kubernetes', 'Jenkins', 'GitLab CI',
+            'GitHub Actions', 'Terraform', 'Ansible', 'CircleCI', 'Travis CI',
+            
+            # Data Science & AI
+            'Machine Learning', 'Deep Learning', 'Data Science', 'Data Analysis', 'TensorFlow',
+            'PyTorch', 'Keras', 'Scikit-learn', 'Pandas', 'NumPy', 'Jupyter', 'NLP',
+            'Computer Vision', 'AI/ML', 'Big Data', 'Apache Spark', 'Hadoop',
+            
+            # Design
+            'UI/UX Design', 'Graphic Design', 'Web Design', 'Logo Design', 'Brand Identity',
+            'Figma', 'Adobe XD', 'Sketch', 'Adobe Photoshop', 'Adobe Illustrator',
+            'InDesign', 'Canva', 'Prototyping', 'Wireframing', '3D Design', 'Blender',
+            'AutoCAD', 'Animation', 'Video Editing', 'After Effects', 'Premiere Pro',
+            
+            # Marketing & Business
+            'Digital Marketing', 'SEO', 'SEM', 'Social Media Marketing', 'Content Marketing',
+            'Email Marketing', 'Google Analytics', 'Facebook Ads', 'Google Ads',
+            'Content Writing', 'Copywriting', 'Technical Writing', 'Blog Writing',
+            'Proofreading', 'Translation', 'Transcription',
+            
+            # Project Management
+            'Project Management', 'Agile', 'Scrum', 'Jira', 'Trello', 'Asana', 'Slack',
+            'Product Management', 'Business Analysis', 'Requirements Gathering',
+            
+            # Testing & QA
+            'Software Testing', 'QA', 'Manual Testing', 'Automation Testing', 'Selenium',
+            'Cypress', 'Jest', 'Pytest', 'Unit Testing', 'Integration Testing',
+            
+            # Blockchain & Web3
+            'Blockchain', 'Ethereum', 'Solidity', 'Smart Contracts', 'Web3', 'Cryptocurrency',
+            'NFT', 'DeFi',
+            
+            # Game Development
+            'Unity', 'Unreal Engine', 'Game Development', 'Game Design', '2D Game Development',
+            '3D Game Development', 'Godot',
+            
+            # Security
+            'Cybersecurity', 'Penetration Testing', 'Ethical Hacking', 'Network Security',
+            'Information Security',
+            
+            # Other Technologies
+            'Linux', 'Windows Server', 'System Administration', 'Network Administration',
+            'WordPress', 'Shopify', 'WooCommerce', 'E-commerce', 'CMS Development',
+            'API Development', 'Database Design', 'Data Modeling', 'ETL',
+            'Version Control', 'Git', 'GitHub', 'GitLab', 'Bitbucket',
+            
+            # Soft Skills
+            'Communication', 'Problem Solving', 'Team Collaboration', 'Time Management',
+            'Critical Thinking', 'Leadership', 'Customer Service'
         ]
+        
         skills = []
         for skill_name in skills_data:
-            skill, _ = Skill.objects.get_or_create(
+            skill, created = Skill.objects.get_or_create(
                 name=skill_name,
-                defaults={'slug': skill_name.lower().replace(' ', '-').replace('/', '-')}
+                defaults={'slug': skill_name.lower().replace(' ', '-').replace('/', '-').replace('.', '')}
             )
             skills.append(skill)
+            if created:
+                self.stdout.write(f'Created skill: {skill_name}')
         
-        self.stdout.write(f'Created {len(skills)} skills')
+        self.stdout.write(self.style.SUCCESS(f'Created/verified {len(skills)} skills'))
 
         # Create Clients
         clients = []

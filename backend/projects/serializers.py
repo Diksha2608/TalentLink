@@ -1,8 +1,8 @@
 # backend/projects/serializers.py
 from rest_framework import serializers
 from .models import Project
-from users.serializers import SkillSerializer
 from users.models import Skill
+from users.serializers import SkillSerializer
 
 class ProjectSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
@@ -23,7 +23,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'skill_ids', 'budget_min', 'budget_max', 'duration_estimate', 'status',
             'visibility', 'attachments', 'proposal_count', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['client', 'created_at', 'updated_at', 'proposal_count']
+        read_only_fields = ['client', 'created_at', 'updated_at', 'proposal_count', 'status']
 
     def get_proposal_count(self, obj):
         return obj.proposals.filter(status='pending').count()
