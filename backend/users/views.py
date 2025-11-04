@@ -1,11 +1,12 @@
-from rest_framework import viewsets, permissions, parsers, response, status
-
+from rest_framework import viewsets, permissions, parsers, response, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
+from django.db.models import Q
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import FreelancerProfile, Skill, ClientProfile,PortfolioFile
 from .serializers import (
     UserSerializer, FreelancerProfileSerializer, UserRegistrationSerializer, 
@@ -66,6 +67,58 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
     serializer_class = FreelancerProfileSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['availability']
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'skills__name', 'role_title']
+    ordering_fields = ['user__rating_avg', 'hourly_rate', 'user__created_at']
+    ordering = ['-user__rating_avg', '-user__created_at']
+    
+    def get_permissions(self):
+        """Allow public access to list action, require auth for others"""
+        if self.action == 'list':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        """Filter queryset based on query parameters"""
+        queryset = FreelancerProfile.objects.select_related('user').prefetch_related('skills').all()
+        
+        # Location filter
+        location = self.request.query_params.get('location', None)
+        if location:
+            queryset = queryset.filter(user__location__icontains=location)
+        
+        # Rating filter (minimum rating)
+        min_rating = self.request.query_params.get('min_rating', None)
+        if min_rating:
+            try:
+                min_rating = float(min_rating)
+                queryset = queryset.filter(user__rating_avg__gte=min_rating)
+            except ValueError:
+                pass
+        
+        # Hourly rate filters
+        min_rate = self.request.query_params.get('min_rate', None)
+        max_rate = self.request.query_params.get('max_rate', None)
+        if min_rate:
+            try:
+                min_rate = float(min_rate)
+                queryset = queryset.filter(hourly_rate__gte=min_rate)
+            except ValueError:
+                pass
+        if max_rate:
+            try:
+                max_rate = float(max_rate)
+                queryset = queryset.filter(hourly_rate__lte=max_rate)
+            except ValueError:
+                pass
+        
+        # Skill filter
+        skill_id = self.request.query_params.get('skill', None)
+        if skill_id:
+            queryset = queryset.filter(skills__id=skill_id)
+        
+        return queryset.distinct()
 
     @action(detail=False, methods=['get', 'put', 'patch'])
     def me(self, request):

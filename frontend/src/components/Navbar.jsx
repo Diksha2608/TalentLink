@@ -28,6 +28,7 @@ export default function Navbar({ user, setUser, loading }) {
   }
   const navItems = user
     ? [
+        { to: '/talent', label: 'Talent' },
         { to: '/projects', label: 'Browse Projects' },
         {
           to: user.role === 'client'
@@ -40,6 +41,7 @@ export default function Navbar({ user, setUser, loading }) {
         { to: '/contracts', label: 'Contracts' },
       ]
     : [
+        { to: '/talent', label: 'Talent' },
         { to: '/projects', label: 'Browse Projects' },
         { to: '/signin', label: 'Sign In' },
       ];
@@ -120,6 +122,9 @@ export default function Navbar({ user, setUser, loading }) {
         <div className="md:hidden bg-gray-50 border-t p-4 space-y-2">
           {user ? (
             <>
+              <Link to="/talent" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">
+                Talent
+              </Link>
               <Link to="/projects" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">
                 Browse Projects
               </Link>
@@ -147,6 +152,9 @@ export default function Navbar({ user, setUser, loading }) {
             </>
           ) : (
             <>
+              <Link to="/talent" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">
+                Talent
+              </Link>
               <Link to="/projects" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">
                 Browse Projects
               </Link>

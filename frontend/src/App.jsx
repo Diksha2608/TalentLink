@@ -20,6 +20,7 @@ import PostProject from './pages/PostProject';
 import FreelancerProfile from './pages/FreelancerProfile';
 import ClientProfile from './pages/ClientProfile';
 import ContractDetail from './pages/ContractDetail';
+import Talent from './pages/Talent';
 
 import './App.css';
 
@@ -69,6 +70,7 @@ function App() {
               path="/onboarding"
               element={<ProtectedRoute user={user}><OnboardingWizard user={user} setUser={setUser} /></ProtectedRoute>}
             />
+            <Route path="/talent" element={<Talent user={user} />} />
             <Route path="/projects" element={<ProjectFeed user={user} />} />
             <Route
               path="/projects/:id"
