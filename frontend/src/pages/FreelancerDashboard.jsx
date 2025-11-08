@@ -199,23 +199,23 @@ export default function FreelancerDashboard({ user }) {
           {/* Profile Progress Card */}
           <div className="col-span-2 sm:col-span-2 lg:col-span-1 rounded-2xl p-3 sm:p-4 bg-gradient-to-br from-purple-500 to-indigo-500 text-white">
             <div className="flex items-center gap-3">
-              <img
-                src={user?.avatar || "/placeholder-avatar.png"}
-                alt="Avatar"
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white/70 flex-shrink-0"
-              />
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
                   <p className="text-xl sm:text-2xl font-bold">{profileCompletion}%</p>
                   <p className="text-xs sm:text-sm opacity-90 truncate">
-                    {profileCompletion >= 90 ? "Perfect!" : profileCompletion >= 60 ? "Almost There" : "Keep Going"}
+                    {profileCompletion >= 90
+                      ? "Perfect!"
+                      : profileCompletion >= 60
+                      ? "Almost There"
+                      : "Keep Going"}
                   </p>
                 </div>
-                {/* Progress bar */}
                 <div className="mt-2 h-1.5 sm:h-2 w-full bg-white/30 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-white rounded-full transition-all"
-                    style={{ width: `${Math.min(100, Math.max(0, profileCompletion))}%` }}
+                    style={{
+                      width: `${Math.min(100, Math.max(0, profileCompletion))}%`,
+                    }}
                   />
                 </div>
               </div>

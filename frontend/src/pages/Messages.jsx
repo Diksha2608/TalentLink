@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Upload, X, Send, Paperclip, Download } from 'lucide-react';
 import { messagesAPI } from '../api/messages';
 import client from '../api/client';
@@ -14,9 +15,10 @@ export default function Messages({ user }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null); // scrollable container
-  const justOpenedRef = useRef(false); 
-
+  const messagesContainerRef = useRef(null);
+  const justOpenedRef = useRef(false);
+  
+  const [searchParams] = useSearchParams();
 
   const isNearBottom = (el, threshold = 120) => {
     if (!el) return true;
@@ -25,22 +27,54 @@ export default function Messages({ user }) {
 
   useEffect(() => {
     loadConversations();
- 
     const conversationInterval = setInterval(loadConversations, 5000);
     return () => clearInterval(conversationInterval);
   }, []);
 
+  // Handle URL parameter to auto-select conversation
+  useEffect(() => {
+    const userId = searchParams.get('user');
+    
+    if (userId && conversations.length > 0) {
+      const foundConv = conversations.find(c => String(c.id) === String(userId));
+      
+      if (foundConv) {
+        setSelectedUser(foundConv);
+      } else {
+        // User not in conversations, fetch their details
+        fetchAndStartConversation(userId);
+      }
+    }
+  }, [searchParams, conversations]);
+
+  const fetchAndStartConversation = async (userId) => {
+    try {
+      const response = await client.get(`/users/${userId}/`);
+      const userData = response.data;
+      
+      const newUser = {
+        id: userData.id,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        email: userData.email,
+        role: userData.role,
+      };
+      
+      setSelectedUser(newUser);
+    } catch (err) {
+      console.error('Failed to fetch user:', err);
+    }
+  };
+
   useEffect(() => {
     if (selectedUser) {
-
       justOpenedRef.current = true;
-
       loadMessages();
 
       setTimeout(() => {
         const el = messagesContainerRef.current;
-        if (el) el.scrollTo({ top: 0, behavior: 'auto' });
-      }, 0);
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+      }, 100);
 
       const interval = setInterval(loadMessages, 3000);
       return () => clearInterval(interval);
@@ -51,7 +85,11 @@ export default function Messages({ user }) {
     const el = messagesContainerRef.current;
 
     if (justOpenedRef.current) {
-      if (el) el.scrollTo({ top: 0, behavior: 'auto' });
+      if (el) {
+        setTimeout(() => {
+          el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+        }, 100);
+      }
       justOpenedRef.current = false;
       return;
     }
@@ -107,7 +145,6 @@ export default function Messages({ user }) {
   const handleFileSelect = (e) => {
     if (e.target.files[0]) {
       const file = e.target.files[0];
-      // Check file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         alert('File size must be less than 10MB');
         return;
@@ -140,8 +177,12 @@ export default function Messages({ user }) {
       setNewMessage('');
       setSelectedFile(null);
       await loadMessages();
-      await loadConversations(); // Refresh conversations list
-      scrollToBottom(); // keep pinned to latest after sending
+      await loadConversations();
+      
+      setTimeout(() => {
+        const el = messagesContainerRef.current;
+        if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }, 100);
     } catch (err) {
       console.error('Failed to send message:', err);
       alert('Failed to send message. Please try again.');
@@ -291,7 +332,7 @@ export default function Messages({ user }) {
                           {selectedUser.first_name} {selectedUser.last_name}
                         </h3>
                         <p className="text-sm text-gray-600">
-                          {selectedUser.role === 'freelancer' ? '💼 Freelancer' : '👔 Client'}
+                          {selectedUser.role === 'freelancer' ? '💼 Freelancer' : '🏢 Client'}
                         </p>
                       </div>
                     </div>

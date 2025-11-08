@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search } from "lucide-react";
+import { Search, X, Filter } from "lucide-react";
 import ProjectCard from "../components/ProjectCard";
 import { projectsAPI } from "../api/projects";
 
@@ -36,6 +36,169 @@ const FIXED_PAYMENT = [
   { value: "25000_plus", label: "₹25,000+" }
 ];
 
+const EXPERIENCE_LEVEL = [
+  { value: "entry", label: "Entry Level" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "expert", label: "Expert" }
+];
+
+const CLIENT_HISTORY = [
+  { value: "no_hires", label: "No hires yet" },
+  { value: "1_9_hires", label: "1-9 hires" },
+  { value: "10_plus_hires", label: "10+ hires" }
+];
+
+const POSTED_TIME = [
+  { value: "24h", label: "Last 24 hours" },
+  { value: "week", label: "Last week" },
+  { value: "month", label: "Last month" }
+];
+
+const LOCATION_TYPE = [
+  { value: "remote", label: "Remote" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "onsite", label: "Onsite" }
+];
+
+const CATEGORIES = [
+  {
+    group: "Accounting & Consulting",
+    items: [
+      "All - Accounting & Consulting",
+      "Personal & Professional Coaching",
+      "Accounting & Bookkeeping",
+      "Financial Planning",
+      "Recruiting & Human Resources",
+      "Management Consulting & Analysis",
+      "Other - Accounting & Consulting"
+    ]
+  },
+  {
+    group: "Admin Support",
+    items: [
+      "All - Admin Support",
+      "Data Entry & Transcription Services",
+      "Virtual Assistance",
+      "Project Management",
+      "Market Research & Product Reviews"
+    ]
+  },
+  {
+    group: "Customer Service",
+    items: [
+      "All - Customer Service",
+      "Community Management & Tagging",
+      "Customer Service & Tech Support"
+    ]
+  },
+  {
+    group: "Data Science & Analytics",
+    items: [
+      "All - Data Science & Analytics",
+      "Data Analysis & Testing",
+      "Data Extraction/ETL",
+      "Data Mining & Management",
+      "AI & Machine Learning"
+    ]
+  },
+  {
+    group: "Design & Creative",
+    items: [
+      "All - Design & Creative",
+      "Art & Illustration",
+      "Audio & Music Production",
+      "Branding & Logo Design",
+      "NFT, AR/VR & Game Art",
+      "Graphic, Editorial & Presentation Design",
+      "Performing Arts",
+      "Photography",
+      "Product Design",
+      "Video & Animation"
+    ]
+  },
+  {
+    group: "Engineering & Architecture",
+    items: [
+      "All - Engineering & Architecture",
+      "Building & Landscape Architecture",
+      "Chemical Engineering",
+      "Civil & Structural Engineering",
+      "Contract Manufacturing",
+      "Electrical & Electronic Engineering",
+      "Interior & Trade Show Design",
+      "Energy & Mechanical Engineering",
+      "Physical Sciences",
+      "3D Modeling & CAD"
+    ]
+  },
+  {
+    group: "IT & Networking",
+    items: [
+      "All - IT & Networking",
+      "Database Management & Administration",
+      "ERP/CRM Software",
+      "Information Security & Compliance",
+      "Network & System Administration",
+      "DevOps & Solution Architecture"
+    ]
+  },
+  {
+    group: "Legal",
+    items: [
+      "All - Legal",
+      "Corporate & Contract Law",
+      "International & Immigration Law",
+      "Finance & Tax Law",
+      "Public Law"
+    ]
+  },
+  {
+    group: "Sales & Marketing",
+    items: [
+      "All - Sales & Marketing",
+      "Digital Marketing",
+      "Lead Generation & Telemarketing",
+      "Marketing, PR & Brand Strategy"
+    ]
+  },
+  {
+    group: "Translation",
+    items: [
+      "All - Translation",
+      "Language Tutoring & Interpretation",
+      "Translation & Localization Services"
+    ]
+  },
+  {
+    group: "Web, Mobile & Software Dev",
+    items: [
+      "All - Web, Mobile & Software Dev",
+      "Blockchain, NFT & Cryptocurrency",
+      "AI Apps & Integration",
+      "Desktop Application Development",
+      "Ecommerce Development",
+      "Game Design & Development",
+      "Mobile Development",
+      "Other - Software Development",
+      "Product Management & Scrum",
+      "QA Testing",
+      "Scripts & Utilities",
+      "Web & Mobile Design",
+      "Web Development"
+    ]
+  },
+  {
+    group: "Writing",
+    items: [
+      "All - Writing",
+      "Sales & Marketing Copywriting",
+      "Content Writing",
+      "Editing & Proofreading Services",
+      "Professional & Business Writing"
+    ]
+  }
+];
+
 function HourlyInputs({ min, max, setMin, setMax }) {
   return (
     <div className="mt-2 ml-4">
@@ -49,7 +212,7 @@ function HourlyInputs({ min, max, setMin, setMax }) {
           value={min}
           min={0}
           onChange={e => setMin(e.target.value)}
-          className="border p-2 rounded w-1/2 text-sm"
+          className="border p-2 rounded w-1/2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
         <input
           type="number"
@@ -57,16 +220,123 @@ function HourlyInputs({ min, max, setMin, setMax }) {
           value={max}
           min={0}
           onChange={e => setMax(e.target.value)}
-          className="border p-2 rounded w-1/2 text-sm"
+          className="border p-2 rounded w-1/2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
     </div>
   );
 }
 
+// Category Dropdown Component
+function CategoryDropdown({ selected, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+
+  const filteredCategories = CATEGORIES.map(cat => ({
+    ...cat,
+    items: cat.items.filter(item =>
+      item.toLowerCase().includes(categorySearch.toLowerCase())
+    )
+  })).filter(cat => cat.items.length > 0);
+
+  const selectedLabel = selected || "Select Categories";
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg text-left bg-white hover:border-purple-400 focus:ring-2 focus:ring-purple-400 focus:outline-none flex justify-between items-center"
+        >
+          <span className={selected ? "text-gray-900" : "text-gray-500"}>
+            {selectedLabel}
+          </span>
+          <svg
+            className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {selected && (
+          <button
+            type="button"
+            onClick={() => onSelect("")}
+            className="text-xs text-purple-600 hover:text-purple-800 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-md transition"
+            title="Clear selected category"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute z-20 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-auto">
+            <div className="sticky top-0 bg-white p-3 border-b">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search categories..."
+                  value={categorySearch}
+                  onChange={e => setCategorySearch(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                  onClick={e => e.stopPropagation()}
+                />
+              </div>
+            </div>
+
+            <div className="p-2">
+              {filteredCategories.map(category => (
+                <div key={category.group} className="mb-3">
+                  <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                    {category.group}
+                  </div>
+                  {category.items.map(item => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => {
+                        onSelect(item);
+                        setOpen(false);
+                        setCategorySearch("");
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm rounded hover:bg-purple-50 ${
+                        selected === item ? "bg-purple-100 text-purple-700 font-medium" : "text-gray-700"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              ))}
+              {filteredCategories.length === 0 && (
+                <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                  No categories found
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 export default function ProjectFeed() {
   const [projects, setProjects] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [duration, setDuration] = useState([]);
   const [hoursPerWeek, setHoursPerWeek] = useState([]);
   const [proposals, setProposals] = useState([]);
@@ -74,15 +344,18 @@ export default function ProjectFeed() {
   const [fixedPayment, setFixedPayment] = useState([]);
   const [hourlyMin, setHourlyMin] = useState("");
   const [hourlyMax, setHourlyMax] = useState("");
-  const [status, setStatus] = useState("open");
+  const [experienceLevel, setExperienceLevel] = useState([]);
+  const [clientHistory, setClientHistory] = useState([]);
+  const [postedTime, setPostedTime] = useState("");
+  const [locationType, setLocationType] = useState([]);
+  const [clientLocation, setClientLocation] = useState("");
+  const [paymentVerified, setPaymentVerified] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Checkbox toggle handler
   const handleCheckbox = (arr, setArr, v) => {
     setArr(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
   };
 
-  // Clear all filters
   const clearAllFilters = () => {
     setDuration([]);
     setHoursPerWeek([]);
@@ -91,19 +364,36 @@ export default function ProjectFeed() {
     setFixedPayment([]);
     setHourlyMin("");
     setHourlyMax("");
+    setSelectedCategory("");
+    setExperienceLevel([]);
+    setClientHistory([]);
+    setPostedTime("");
+    setLocationType([]);
+    setClientLocation("");
+    setPaymentVerified(false);
   };
 
-  // Fetch projects whenever filters change
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
   useEffect(() => {
     setLoading(true);
 
     const filterParams = {
-      status,
+      status: "open",
       search: searchTerm,
       duration: duration.join(","),
       hours_per_week: hoursPerWeek.join(","),
       proposal_range: proposals.join(","),
-      job_type: jobTypes.join(",")
+      job_type: jobTypes.join(","),
+      category: selectedCategory,
+      experience_level: experienceLevel.join(","),
+      client_history: clientHistory.join(","),
+      posted_time: postedTime,
+      location_type: locationType.join(","),
+      client_location: clientLocation,
+      payment_verified: paymentVerified
     };
 
     if (jobTypes.includes("fixed")) {
@@ -115,22 +405,18 @@ export default function ProjectFeed() {
       if (hourlyMax) filterParams.hourly_max = hourlyMax;
     }
 
-    console.log("=== Sending filter params ===", JSON.stringify(filterParams, null, 2));
-
     projectsAPI
       .list(filterParams)
       .then(res => {
         const projectData = res.data.results || res.data;
-        console.log(`✅ Received ${projectData.length} projects`);
         setProjects(projectData);
       })
       .catch(err => {
-        console.error("❌ Error fetching projects:", err);
+        console.error("Error fetching projects:", err);
         setProjects([]);
       })
       .finally(() => setLoading(false));
   }, [
-    status,
     duration,
     hoursPerWeek,
     proposals,
@@ -138,89 +424,111 @@ export default function ProjectFeed() {
     fixedPayment,
     hourlyMin,
     hourlyMax,
-    searchTerm
+    searchTerm,
+    selectedCategory,
+    experienceLevel,
+    clientHistory,
+    postedTime,
+    locationType,
+    clientLocation,
+    paymentVerified
   ]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-purple-100 to-white py-10">
+    <div className="min-h-screen bg-gray-50 py-6">
       <div className="container mx-auto px-4">
-        {/* ========================================== */}
-        {/* SECTION 1: SEARCH & STATUS (COMBINED) */}
-        {/* ========================================== */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-purple-800 mb-4">
-            Search Projects
-          </h2>
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-            }}
-            className="flex flex-col md:flex-row gap-4"
-          >
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Browse Projects</h1>
+          <p className="text-gray-600">Find your next opportunity</p>
+        </div>
+
+        {/* Search & Category Section */}
+        <div className="bg-white rounded-lg shadow-md p-5 mb-6">
+          <div className="grid md:grid-cols-2 gap-4">
             {/* Search Input */}
-            <div className="flex-1">
+            <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Search by keyword or skill
               </label>
-              <input
-                type="text"
-                placeholder="🔍 Enter keyword, skill, or project title..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="border border-gray-300 px-4 py-3 rounded-lg w-full focus:ring-2 focus:ring-purple-400 focus:outline-none"
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="🔍 Enter keyword, skill, or project title..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={clearSearch}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Category Dropdown */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Category
+              </label>
+              <CategoryDropdown
+                selected={selectedCategory}
+                onSelect={setSelectedCategory}
               />
             </div>
-
-            {/* Status Dropdown */}
-            <div className="md:w-48">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Project Status
-              </label>
-              <select
-                className="border border-gray-300 p-3 rounded-lg w-full text-purple-800 font-bold focus:ring-2 focus:ring-purple-400 focus:outline-none"
-                value={status}
-                onChange={e => setStatus(e.target.value)}
-              >
-                <option value="open">Open</option>
-                <option value="in_progress">Ongoing</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-
-            {/* Search Button */}
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-8 py-3 rounded-lg font-bold hover:from-purple-700 hover:to-purple-800 transition shadow-md flex items-center gap-2 h-[46px]"
-              >
-                <Search size={20} />
-                Search
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
 
-        {/* ========================================== */}
-        {/* SECTION 2: FILTERS & PROJECT RESULTS */}
-        {/* ========================================== */}
-        <div className="flex gap-7">
+        {/* Filters & Results */}
+        <div className="flex gap-6">
           {/* FILTER SIDEBAR */}
-          <aside className="w-80 bg-white rounded-xl shadow-lg p-6 shrink-0 h-fit sticky top-4">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b-2 border-purple-200">
-              <h3 className="font-bold text-xl text-purple-800">Filters</h3>
+          <aside className="w-72 bg-white rounded-lg shadow-md p-5 shrink-0 h-fit sticky top-20">
+            <div className="flex justify-between items-center mb-5 pb-4 border-b border-gray-200">
+              <h3 className="font-semibold text-base text-gray-900 flex items-center gap-2">
+                <Filter size={18} />
+                Filters
+              </h3>
               <button
                 type="button"
-                className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold px-3 py-1.5 rounded-md transition"
+                className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-700 font-semibold px-3 py-1.5 rounded-md transition"
                 onClick={clearAllFilters}
               >
                 Clear All
               </button>
             </div>
 
+            {/* Experience Level */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Experience Level
+              </div>
+              {EXPERIENCE_LEVEL.map(o => (
+                <label
+                  key={o.value}
+                  className="flex items-center ml-2 py-2 cursor-pointer hover:bg-purple-50 rounded px-2 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={experienceLevel.includes(o.value)}
+                    onChange={() => handleCheckbox(experienceLevel, setExperienceLevel, o.value)}
+                    className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700">{o.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
             {/* Project Length */}
-            <div className="mb-6">
-              <div className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wide">
-                📅 Project Length
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Project Length
               </div>
               {DURATION.map(o => (
                 <label
@@ -240,10 +548,106 @@ export default function ProjectFeed() {
 
             <div className="border-t border-gray-200 my-4" />
 
+            {/* Client History */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Client History
+              </div>
+              {CLIENT_HISTORY.map(o => (
+                <label
+                  key={o.value}
+                  className="flex items-center ml-2 py-2 cursor-pointer hover:bg-purple-50 rounded px-2 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={clientHistory.includes(o.value)}
+                    onChange={() => handleCheckbox(clientHistory, setClientHistory, o.value)}
+                    className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700">{o.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
+            {/* Payment Verified */}
+            <div className="mb-5">
+              <label className="flex items-center ml-2 py-2 cursor-pointer hover:bg-purple-50 rounded px-2 transition">
+                <input
+                  type="checkbox"
+                  checked={paymentVerified}
+                  onChange={(e) => setPaymentVerified(e.target.checked)}
+                  className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
+                />
+                <span className="text-sm font-semibold text-gray-800">Payment Verified Clients</span>
+              </label>
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
+            {/* Posted Time */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Posted Time
+              </div>
+              <select
+                value={postedTime}
+                onChange={(e) => setPostedTime(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Any time</option>
+                {POSTED_TIME.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
+            {/* Location Type */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Location Type
+              </div>
+              {LOCATION_TYPE.map(o => (
+                <label
+                  key={o.value}
+                  className="flex items-center ml-2 py-2 cursor-pointer hover:bg-purple-50 rounded px-2 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={locationType.includes(o.value)}
+                    onChange={() => handleCheckbox(locationType, setLocationType, o.value)}
+                    className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700">{o.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
+            {/* Client Location */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Client Location
+              </div>
+              <input
+                type="text"
+                placeholder="Enter location..."
+                value={clientLocation}
+                onChange={(e) => setClientLocation(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
             {/* Hours per Week */}
-            <div className="mb-6">
-              <div className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wide">
-                ⏰ Hours / Week
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Hours / Week
               </div>
               {HOURS_PER_WEEK.map(o => (
                 <label
@@ -266,9 +670,9 @@ export default function ProjectFeed() {
             <div className="border-t border-gray-200 my-4" />
 
             {/* Proposal Count */}
-            <div className="mb-6">
-              <div className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wide">
-                📝 Number of Proposals
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Number of Proposals
               </div>
               {PROPOSALS.map(o => (
                 <label
@@ -289,9 +693,9 @@ export default function ProjectFeed() {
             <div className="border-t border-gray-200 my-4" />
 
             {/* Job Type & Payment */}
-            <div className="mb-6">
-              <div className="text-sm font-bold text-gray-800 mb-3 uppercase tracking-wide">
-                💼 Job Type & Payment
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">
+                Job Type & Payment
               </div>
               {JOB_TYPES.map(o => (
                 <label
@@ -304,7 +708,7 @@ export default function ProjectFeed() {
                     onChange={() => handleCheckbox(jobTypes, setJobTypes, o.value)}
                     className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
                   />
-                  <span className="text-sm font-bold text-gray-700">{o.label}</span>
+                  <span className="text-sm font-semibold text-gray-700">{o.label}</span>
                 </label>
               ))}
 
@@ -346,26 +750,29 @@ export default function ProjectFeed() {
           {/* PROJECT RESULTS */}
           <main className="flex-1">
             {loading ? (
-              <div className="text-center mt-20 text-purple-500 font-bold text-xl animate-pulse">
-                🔄 Loading projects...
+              <div className="text-center py-16">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+                <p className="mt-4 text-gray-600">Loading projects...</p>
               </div>
             ) : projects.length === 0 ? (
-              <div className="text-center mt-20">
-                <div className="text-6xl mb-4">📭</div>
-                <div className="text-purple-500 font-bold text-2xl">
-                  No projects found
-                </div>
-                <p className="text-gray-500 mt-2">
-                  Try adjusting your filters or search terms
-                </p>
+              <div className="text-center py-16 bg-white rounded-lg shadow-md">
+                <Search size={48} className="mx-auto text-gray-300 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No projects found</h3>
+                <p className="text-gray-600 mb-4">Try adjusting your filters or search terms</p>
+                <button
+                  onClick={clearAllFilters}
+                  className="px-5 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition"
+                >
+                  Clear Filters
+                </button>
               </div>
             ) : (
               <>
-                <div className="mb-4 text-gray-600">
-                  <span className="font-bold text-purple-800">{projects.length}</span>{" "}
+                <div className="mb-4 text-sm text-gray-600">
+                  <span className="font-semibold text-gray-900">{projects.length}</span>{" "}
                   project{projects.length !== 1 ? "s" : ""} found
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {projects.map(project => (
                     <div key={project.id} className="transition hover:scale-[1.02]">
                       <ProjectCard project={project} />

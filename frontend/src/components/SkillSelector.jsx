@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from 'react';
 import { Search, Plus, X, Loader } from 'lucide-react';
 import client from '../api/client';
 
-export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
+export default function SkillSelector({ selectedSkills = [], setSelectedSkills }) {
   const [allSkills, setAllSkills] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -11,23 +12,16 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => { loadSkills(); }, []);
   useEffect(() => {
-    loadSkills();
-  }, []);
-
-  useEffect(() => {
-    if (searchTerm.length >= 2) {
-      searchSkills();
-    } else if (searchTerm.length === 0) {
-      loadSkills();
-    }
+    if (searchTerm.length >= 2) searchSkills();
+    else if (searchTerm.length === 0) loadSkills();
   }, [searchTerm]);
 
   const loadSkills = async () => {
     setLoading(true);
     try {
       const response = await client.get('/skills/');
-      // Handle both paginated and non-paginated responses
       const skillsData = response.data.results || response.data;
       setAllSkills(Array.isArray(skillsData) ? skillsData : []);
     } catch (err) {
@@ -41,10 +35,7 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
   const searchSkills = async () => {
     setLoading(true);
     try {
-      const response = await client.get('/skills/', {
-        params: { search: searchTerm }
-      });
-      // Handle both paginated and non-paginated responses
+      const response = await client.get('/skills/', { params: { search: searchTerm } });
       const skillsData = response.data.results || response.data;
       setAllSkills(Array.isArray(skillsData) ? skillsData : []);
     } catch (err) {
@@ -56,44 +47,27 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
   };
 
   const toggleSkill = (skill) => {
-    if (selectedSkills.find((s) => s.id === skill.id)) {
-      setSelectedSkills(selectedSkills.filter((s) => s.id !== skill.id));
+    const safeSelected = Array.isArray(selectedSkills) ? selectedSkills : [];
+    if (safeSelected.find((s) => s.id === skill.id)) {
+      setSelectedSkills(safeSelected.filter((s) => s.id !== skill.id));
     } else {
-      setSelectedSkills([...selectedSkills, skill]);
+      setSelectedSkills([...safeSelected, skill]);
     }
   };
 
   const createCustomSkill = async () => {
-    if (!customSkillName.trim()) {
-      setError('Please enter a skill name');
-      return;
-    }
-
-    if (customSkillName.length < 2) {
-      setError('Skill name must be at least 2 characters');
-      return;
-    }
+    if (!customSkillName.trim()) return setError('Please enter a skill name');
+    if (customSkillName.length < 2) return setError('Skill name must be at least 2 characters');
 
     setCreating(true);
     setError('');
-
     try {
-      const response = await client.post('/skills/create_custom/', {
-        name: customSkillName.trim()
-      });
-
+      const response = await client.post('/skills/create_custom/', { name: customSkillName.trim() });
       const newSkill = response.data;
-      
-      // Add to all skills list
       setAllSkills([newSkill, ...allSkills]);
-      
-      // Add to selected skills
-      setSelectedSkills([...selectedSkills, newSkill]);
-      
-      // Reset form
-      setCustomSkillName('');
-      setShowCustomInput(false);
-      setSearchTerm('');
+      const safeSelected = Array.isArray(selectedSkills) ? selectedSkills : [];
+      setSelectedSkills([...safeSelected, newSkill]);
+      setCustomSkillName(''); setShowCustomInput(false); setSearchTerm('');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create skill');
     } finally {
@@ -101,8 +75,9 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
     }
   };
 
-  const filteredSkills = Array.isArray(allSkills) 
-    ? allSkills.filter(skill => !selectedSkills.find(s => s.id === skill.id))
+  const safeSelectedSkills = Array.isArray(selectedSkills) ? selectedSkills : [];
+  const filteredSkills = Array.isArray(allSkills)
+    ? allSkills.filter(skill => !safeSelectedSkills.find(s => s.id === skill.id))
     : [];
 
   return (
@@ -115,21 +90,35 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
           placeholder="Search skills (e.g., React, Python, Design)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+          className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
         />
+
+        {searchTerm && !loading && (
+          <button
+            type="button"
+            onClick={() => setSearchTerm('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label="Clear search"
+            title="Clear"
+          >
+            <X size={18} />
+          </button>
+        )}
+
+        {/* Loader stays at the far right */}
         {loading && (
           <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" size={20} />
         )}
       </div>
 
       {/* Selected Skills */}
-      {selectedSkills.length > 0 && (
+      {safeSelectedSkills.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Selected Skills ({selectedSkills.length})
+            Selected Skills ({safeSelectedSkills.length})
           </label>
           <div className="flex flex-wrap gap-2">
-            {selectedSkills.map((skill) => (
+            {safeSelectedSkills.map((skill) => (
               <span
                 key={skill.id}
                 className="px-3 py-2 bg-purple-600 text-white rounded-full text-sm cursor-pointer hover:bg-purple-700 transition flex items-center gap-2"
@@ -162,17 +151,13 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
             <h4 className="font-semibold text-purple-900">Add Custom Skill</h4>
             <button
               type="button"
-              onClick={() => {
-                setShowCustomInput(false);
-                setCustomSkillName('');
-                setError('');
-              }}
+              onClick={() => { setShowCustomInput(false); setCustomSkillName(''); setError(''); }}
               className="text-gray-500 hover:text-gray-700"
             >
               <X size={20} />
             </button>
           </div>
-          
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded mb-3 text-sm">
               {error}
@@ -195,22 +180,10 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
               disabled={creating}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {creating ? (
-                <>
-                  <Loader size={18} className="animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <Plus size={18} />
-                  Add
-                </>
-              )}
+              {creating ? (<><Loader size={18} className="animate-spin" />Adding...</>) : (<><Plus size={18} />Add</>)}
             </button>
           </div>
-          <p className="text-xs text-purple-700 mt-2">
-            💡 If the skill doesn't exist, it will be created and added to your profile
-          </p>
+          <p className="text-xs text-purple-700 mt-2">💡 If the skill doesn't exist, it will be created and added to your profile</p>
         </div>
       )}
 
@@ -257,7 +230,7 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
       {/* Skills Count Info */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-sm text-blue-800">
-          💡 <strong>Tip:</strong> Select 5-15 relevant skills for best results. 
+          💡 <strong>Tip:</strong> Select 5-15 relevant skills for best results.
           You can add custom skills if you don't find what you're looking for.
         </p>
       </div>

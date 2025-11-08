@@ -37,12 +37,9 @@ export default function SignIn({ setUser }) {
       setDebugInfo('Redirecting...');
 
       if (userResponse.data.role === 'freelancer') {
-        if (!userResponse.data.profile_complete) {
-          navigate('/onboarding');
-        } else {
           navigate('/dashboard/freelancer');
         }
-      } else {
+     else {
         navigate('/dashboard/client');
       }
     } catch (err) {

@@ -1,5 +1,5 @@
 // frontend/src/App.jsx 
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -20,12 +20,20 @@ import PostProject from './pages/PostProject';
 import FreelancerProfile from './pages/FreelancerProfile';
 import ClientProfile from './pages/ClientProfile';
 import ContractDetail from './pages/ContractDetail';
+import ProposalDetail from './pages/ProposalDetail';
 import Talent from './pages/Talent';
+import Jobs from './pages/Jobs';
+import Clients from './pages/Clients';
+import Notifications from './pages/Notifications';
+import AccountSettings from './pages/AccountSettings';
+import Earnings from './pages/Earnings';
+import Payments from './pages/Payments';
+import Invoices from './pages/Invoices';
+import PostJob from './pages/PostJob';
 
 import './App.css';
 
 function App() {
-
   const [user, setUser] = useState(() => {
     const cached = localStorage.getItem('user');
     return cached ? JSON.parse(cached) : null;
@@ -53,68 +61,186 @@ function App() {
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading...
+      </div>
+    );
   }
-  {console.log('🧭 ROUTE:', window.location.pathname, 'USER:', user)}
 
   return (
     <Router>
-      <div className="flex flex-col min-h-screen">
-        <Navbar user={user} setUser={setUser} loading={loading} />
-        <main className="flex-1">
-          <Routes>
-            <Route path="/" element={<Landing user={user} />} />
-            <Route path="/signup" element={<SignUp setUser={setUser} />} />
-            <Route path="/signin" element={<SignIn setUser={setUser} />} />
-            <Route
-              path="/onboarding"
-              element={<ProtectedRoute user={user}><OnboardingWizard user={user} setUser={setUser} /></ProtectedRoute>}
-            />
-            <Route path="/talent" element={<Talent user={user} />} />
-            <Route path="/projects" element={<ProjectFeed user={user} />} />
-            <Route
-              path="/projects/:id"
-              element={<ProtectedRoute user={user}><ProjectDetail user={user} /></ProtectedRoute>}
-            />
-            <Route
-              path="/dashboard/client"
-              element={<ProtectedRoute user={user}><ClientDashboard user={user} /></ProtectedRoute>}
-            />
-            <Route path="/contracts" element={<Contracts user={user} />} />
-            <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
-            <Route
-              path="/dashboard/freelancer"
-              element={<ProtectedRoute user={user}><FreelancerDashboard user={user} /></ProtectedRoute>}
-            />
-            <Route
-              path="/messages"
-              element={<ProtectedRoute user={user}><Messages user={user} /></ProtectedRoute>}
-            />
-            <Route
-              path="/contracts"
-              element={<ProtectedRoute user={user}><Contracts user={user} /></ProtectedRoute>}
-            />
-            <Route path="/test-api" element={<TestAPI />} />
-            <Route path="/projects/create" element={<ProtectedRoute user={user}><PostProject user={user} /></ProtectedRoute>} />
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute user={user}>
-                  {user?.role === 'freelancer' ? (
-                    <FreelancerProfile user={user} setUser={setUser} />
-                  ) : (
-                    <ClientProfile user={user} setUser={setUser} />
-                  )}
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-        <Footer user={user} />
-      </div>
+      <AppLayout user={user} setUser={setUser} loading={loading} />
     </Router>
   );
 }
+
+function AppLayout({ user, setUser, loading }) {
+  const location = useLocation();
+
+
+  const hideChrome = location.pathname === '/onboarding';
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      {!hideChrome && (
+        <Navbar user={user} setUser={setUser} loading={loading} />
+      )}
+
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Landing user={user} />} />
+          <Route path="/signup" element={<SignUp setUser={setUser} />} />
+          <Route path="/signin" element={<SignIn setUser={setUser} />} />
+
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute user={user}>
+                <OnboardingWizard user={user} setUser={setUser} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/talent" element={<Talent user={user} />} />
+          <Route path="/projects" element={<ProjectFeed user={user} />} />
+          <Route path="/jobs" element={<Jobs user={user} />} />
+          <Route path="/clients" element={<Clients user={user} />} />
+
+          <Route
+            path="/projects/:id"
+            element={
+              <ProtectedRoute user={user}>
+                <ProjectDetail user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/client"
+            element={
+              <ProtectedRoute user={user}>
+                <ClientDashboard user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/contracts" element={<Contracts user={user} />} />
+          <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
+
+          <Route
+            path="/dashboard/freelancer"
+            element={
+              <ProtectedRoute user={user}>
+                <FreelancerDashboard user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute user={user}>
+                <Messages user={user} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages/:threadId"
+            element={
+              <ProtectedRoute user={user}>
+                <Messages user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute user={user}>
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute user={user}>
+                <AccountSettings user={user} setUser={setUser} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/earnings"
+            element={
+              <ProtectedRoute user={user}>
+                <Earnings user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/payments"
+            element={
+              <ProtectedRoute user={user}>
+                <Payments />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/invoices"
+            element={
+              <ProtectedRoute user={user}>
+                <Invoices />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/proposals/:proposalId"
+            element={
+              <ProtectedRoute user={user}>
+                <ProposalDetail user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/test-api" element={<TestAPI />} />
+          <Route path="/jobs/create" element={<PostJob user={user} />} />
+
+          <Route
+            path="/projects/create"
+            element={
+              <ProtectedRoute user={user}>
+                <PostProject user={user} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute user={user}>
+                {user?.role === 'freelancer' ? (
+                  <FreelancerProfile user={user} setUser={setUser} />
+                ) : (
+                  <ClientProfile user={user} setUser={setUser} />
+                )}
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </main>
+
+      {!hideChrome && <Footer user={user} />}
+    </div>
+  );
+}
+
 export default App;
