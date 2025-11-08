@@ -5,9 +5,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
-from django.db.models import Q
+from django.db.models import Q, Count
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import FreelancerProfile, Skill, ClientProfile,PortfolioFile
+from .models import FreelancerProfile, Skill, ClientProfile, PortfolioFile
 from .serializers import (
     UserSerializer, FreelancerProfileSerializer, UserRegistrationSerializer, 
     SkillSerializer, EmailTokenObtainSerializer, ClientProfileSerializer, PortfolioFileSerializer
@@ -69,8 +69,8 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['availability']
-    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'skills__name', 'role_title']
-    ordering_fields = ['user__rating_avg', 'hourly_rate', 'user__created_at']
+    search_fields = ['user__first_name', 'user__last_name', 'user__email', 'skills__name', 'role_title', 'portfolio']
+    ordering_fields = ['user__rating_avg', 'hourly_rate', 'user__created_at', 'projects_completed']
     ordering = ['-user__rating_avg', '-user__created_at']
     
     def get_permissions(self):
@@ -80,7 +80,7 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
-        """Filter queryset based on query parameters"""
+        """Enhanced filtering for freelancer profiles"""
         queryset = FreelancerProfile.objects.select_related('user').prefetch_related('skills').all()
         
         # Location filter
@@ -88,7 +88,7 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
         if location:
             queryset = queryset.filter(user__location__icontains=location)
         
-        # Rating filter (minimum rating)
+        # Rating filters
         min_rating = self.request.query_params.get('min_rating', None)
         if min_rating:
             try:
@@ -96,6 +96,16 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(user__rating_avg__gte=min_rating)
             except ValueError:
                 pass
+        
+        # Top rated filter (4.5+)
+        top_rated = self.request.query_params.get('top_rated', None)
+        if top_rated == 'true':
+            queryset = queryset.filter(user__rating_avg__gte=4.5)
+        
+        # Rising talent (new users with projects)
+        rising_talent = self.request.query_params.get('rising_talent', None)
+        if rising_talent == 'true':
+            queryset = queryset.filter(projects_completed__lte=5, projects_completed__gt=0)
         
         # Hourly rate filters
         min_rate = self.request.query_params.get('min_rate', None)
@@ -113,10 +123,30 @@ class FreelancerProfileViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
         
+        # Experience level (based on projects completed)
+        experience_level = self.request.query_params.get('experience_level', None)
+        if experience_level == 'entry':
+            queryset = queryset.filter(projects_completed__lt=5)
+        elif experience_level == 'intermediate':
+            queryset = queryset.filter(projects_completed__gte=5, projects_completed__lt=20)
+        elif experience_level == 'expert':
+            queryset = queryset.filter(projects_completed__gte=20)
+        
         # Skill filter
         skill_id = self.request.query_params.get('skill', None)
         if skill_id:
             queryset = queryset.filter(skills__id=skill_id)
+        
+        # Project success rate (using rating as proxy)
+        success_rate = self.request.query_params.get('success_rate', None)
+        if success_rate:
+            try:
+                rate = float(success_rate)
+                # Convert percentage to rating (e.g., 90% = 4.5 stars)
+                min_rating_from_success = (rate / 100) * 5
+                queryset = queryset.filter(user__rating_avg__gte=min_rating_from_success)
+            except ValueError:
+                pass
         
         return queryset.distinct()
 

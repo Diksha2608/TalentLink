@@ -3,25 +3,41 @@ from rest_framework import viewsets
 from rest_framework.permissions import AllowAny
 from .models import Project
 from .serializers import ProjectSerializer
+from rest_framework.permissions import IsAuthenticated
+
+# === ADDED: parsers + action/response + proposals serializer ===
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from proposals.serializers import ProposalSerializer
+from proposals.models import Proposal
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
-    permission_classes = [AllowAny]
-    queryset = Project.objects.all()
+    permission_classes = [IsAuthenticated]  # only logged-in users can post projects
+
+
+    queryset = (
+        Project.objects
+        .all()
+        .select_related('client')
+        .prefetch_related('skills_required', 'file_attachments')
+    )
+
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
+    def perform_create(self, serializer):
+        serializer.save(client=self.request.user)
 
     def get_queryset(self):
         """
         Filter projects based on multiple criteria.
         Returns queryset of filtered projects.
         """
-        # Start with base queryset - only public projects
         qs = Project.objects.filter(visibility='public')
-        
-        # Annotate with proposal count for filtering
+
         qs = qs.annotate(num_proposals=Count('proposals'))
-        
-        # Get query parameters
         params = self.request.query_params
 
         # ==========================================
@@ -81,7 +97,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         proposal_query |= Q(num_proposals__gte=15, num_proposals__lte=30)
                     elif val == "30_plus":
                         proposal_query |= Q(num_proposals__gt=30)
-                
+
                 if proposal_query:
                     qs = qs.filter(proposal_query)
                     print(f"✓ Proposal filter {proposal_list}: {qs.count()} projects")
@@ -181,6 +197,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
             print(f"✓ Search filter '{search}': {qs.count()} projects")
 
         # ==========================================
+        # 7. CATEGORY FILTER (NEW)
+        # ==========================================
+        category = params.get("category", "").strip()
+        if category:
+            qs = qs.filter(category=category)
+            print(f"✓ Category filter '{category}': {qs.count()} projects")
+
+        # ==========================================
         # FINAL RESULT
         # ==========================================
         print("-"*50)
@@ -188,3 +212,18 @@ class ProjectViewSet(viewsets.ModelViewSet):
         print("="*50 + "\n")
 
         return qs
+
+    @action(detail=True, methods=['get'], url_path='proposals', permission_classes=[IsAuthenticated])
+    def proposals(self, request, pk=None):
+        project = self.get_object()
+
+        qs = project.proposals.select_related('freelancer').all()
+        ser = ProposalSerializer(qs, many=True, context={'request': request})
+        return Response(ser.data)
+
+    def destroy(self, request, *args, **kwargs):
+        project = self.get_object()
+        if project.client != request.user:
+            from rest_framework import status
+            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)

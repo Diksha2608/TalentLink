@@ -1,5 +1,6 @@
+# backend/messaging/views.py 
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
@@ -66,12 +67,12 @@ class MessageViewSet(viewsets.ModelViewSet):
         from users.serializers import UserSerializer
         return Response(UserSerializer(list(users_in_conversation), many=True).data)
 
-    @action(detail=False, methods=['get'])
-    def with_user(self, request):
-        other_user_id = request.query_params.get('user_id')
+    @action(detail=False, methods=['get'], url_path='with/(?P<user_id>[^/.]+)')
+    def with_user(self, request, user_id=None):
+        """Get messages with a specific user"""
         messages = self.get_queryset().filter(
-            Q(sender_id=other_user_id, recipient=request.user) |
-            Q(sender=request.user, recipient_id=other_user_id)
+            Q(sender_id=user_id, recipient=request.user) |
+            Q(sender=request.user, recipient_id=user_id)
         ).order_by('created_at')
         
         # Mark messages as read
@@ -97,3 +98,37 @@ class MessageViewSet(viewsets.ModelViewSet):
         
         from users.serializers import UserSerializer
         return Response(UserSerializer(users, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_or_create_thread(request):
+    """Get or create a thread with a specific user"""
+    other_user_id = request.data.get('user_id')
+    
+    if not other_user_id:
+        return Response({'error': 'user_id required'}, status=400)
+    
+    try:
+        other_user = User.objects.get(id=other_user_id)
+        
+        # Get or create conversation
+        conversation = Conversation.objects.filter(
+            participants=request.user
+        ).filter(
+            participants=other_user
+        ).first()
+        
+        if not conversation:
+            conversation = Conversation.objects.create()
+            conversation.participants.add(request.user, other_user)
+        
+        return Response({
+            'id': other_user.id,
+            'thread': {
+                'id': other_user.id,
+                'conversation_id': conversation.id
+            }
+        })
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=404)
