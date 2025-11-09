@@ -30,6 +30,7 @@ import Earnings from './pages/Earnings';
 import Payments from './pages/Payments';
 import Invoices from './pages/Invoices';
 import PostJob from './pages/PostJob';
+import JobDetail from './pages/JobDetail';
 
 import './App.css';
 
@@ -211,6 +212,7 @@ function AppLayout({ user, setUser, loading }) {
 
           <Route path="/test-api" element={<TestAPI />} />
           <Route path="/jobs/create" element={<PostJob user={user} />} />
+          <Route path="/jobs/:id" element={<JobDetail user={user} />} />
 
           <Route
             path="/projects/create"

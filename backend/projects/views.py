@@ -1,22 +1,123 @@
 from django.db.models import Q, Count
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .models import Project
 from .serializers import ProjectSerializer
-from rest_framework.permissions import IsAuthenticated
 
-# === ADDED: parsers + action/response + proposals serializer ===
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from proposals.serializers import ProposalSerializer
 from proposals.models import Proposal
 
+CATEGORY_GROUPS = {
+    "All - Accounting & Consulting": [
+        "All - Accounting & Consulting",
+        "Personal & Professional Coaching",
+        "Accounting & Bookkeeping",
+        "Financial Planning",
+        "Recruiting & Human Resources",
+        "Management Consulting & Analysis",
+        "Other - Accounting & Consulting"
+    ],
+    "All - Admin Support": [
+        "All - Admin Support",
+        "Data Entry & Transcription Services",
+        "Virtual Assistance",
+        "Project Management",
+        "Market Research & Product Reviews"
+    ],
+    "All - Customer Service": [
+        "All - Customer Service",
+        "Community Management & Tagging",
+        "Customer Service & Tech Support"
+    ],
+    "All - Data Science & Analytics": [
+        "All - Data Science & Analytics",
+        "Data Analysis & Testing",
+        "Data Extraction/ETL",
+        "Data Mining & Management",
+        "AI & Machine Learning"
+    ],
+    "All - Design & Creative": [
+        "All - Design & Creative",
+        "Art & Illustration",
+        "Audio & Music Production",
+        "Branding & Logo Design",
+        "NFT, AR/VR & Game Art",
+        "Graphic, Editorial & Presentation Design",
+        "Performing Arts",
+        "Photography",
+        "Product Design",
+        "Video & Animation"
+    ],
+    "All - Engineering & Architecture": [
+        "All - Engineering & Architecture",
+        "Building & Landscape Architecture",
+        "Chemical Engineering",
+        "Civil & Structural Engineering",
+        "Contract Manufacturing",
+        "Electrical & Electronic Engineering",
+        "Interior & Trade Show Design",
+        "Energy & Mechanical Engineering",
+        "Physical Sciences",
+        "3D Modeling & CAD"
+    ],
+    "All - IT & Networking": [
+        "All - IT & Networking",
+        "Database Management & Administration",
+        "ERP/CRM Software",
+        "Information Security & Compliance",
+        "Network & System Administration",
+        "DevOps & Solution Architecture"
+    ],
+    "All - Legal": [
+        "All - Legal",
+        "Corporate & Contract Law",
+        "International & Immigration Law",
+        "Finance & Tax Law",
+        "Public Law"
+    ],
+    "All - Sales & Marketing": [
+        "All - Sales & Marketing",
+        "Digital Marketing",
+        "Lead Generation & Telemarketing",
+        "Marketing, PR & Brand Strategy"
+    ],
+    "All - Translation": [
+        "All - Translation",
+        "Language Tutoring & Interpretation",
+        "Translation & Localization Services"
+    ],
+    "All - Web, Mobile & Software Dev": [
+        "All - Web, Mobile & Software Dev",
+        "Blockchain, NFT & Cryptocurrency",
+        "AI Apps & Integration",
+        "Desktop Application Development",
+        "Ecommerce Development",
+        "Game Design & Development",
+        "Mobile Development",
+        "Other - Software Development",
+        "Product Management & Scrum",
+        "QA Testing",
+        "Scripts & Utilities",
+        "Web & Mobile Design",
+        "Web Development"
+    ],
+    "All - Writing": [
+        "All - Writing",
+        "Sales & Marketing Copywriting",
+        "Content Writing",
+        "Editing & Proofreading Services",
+        "Professional & Business Writing"
+    ]
+}
+
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated]  # only logged-in users can post projects
 
+    permission_classes = [AllowAny]
 
     queryset = (
         Project.objects
@@ -27,7 +128,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
+    def get_permissions(self):
+        """
+        Allow unauthenticated users to list and retrieve projects.
+        Require authentication for create, update, delete.
+        """
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
     def perform_create(self, serializer):
+        # Automatically assign logged-in user as client
         serializer.save(client=self.request.user)
 
     def get_queryset(self):
@@ -35,9 +146,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Filter projects based on multiple criteria.
         Returns queryset of filtered projects.
         """
+
         qs = Project.objects.filter(visibility='public')
 
         qs = qs.annotate(num_proposals=Count('proposals'))
+
         params = self.request.query_params
 
         # ==========================================
@@ -103,7 +216,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     print(f"✓ Proposal filter {proposal_list}: {qs.count()} projects")
 
         # ==========================================
-        # 5. JOB TYPE & PAYMENT FILTERS (UPDATED)
+        # 5. JOB TYPE & PAYMENT FILTERS 
         # ==========================================
         job_types_param = params.get("job_type", "").strip()
 
@@ -197,12 +310,48 @@ class ProjectViewSet(viewsets.ModelViewSet):
             print(f"✓ Search filter '{search}': {qs.count()} projects")
 
         # ==========================================
-        # 7. CATEGORY FILTER (NEW)
+        # 7. CATEGORY FILTER (HIERARCHICAL - UPDATED)
         # ==========================================
         category = params.get("category", "").strip()
         if category:
-            qs = qs.filter(category=category)
-            print(f"✓ Category filter '{category}': {qs.count()} projects")
+            # Check if this is an "All - ..." category
+            if category in CATEGORY_GROUPS:
+                # Get all subcategories for this group
+                subcategories = CATEGORY_GROUPS[category]
+                qs = qs.filter(category__in=subcategories)
+                print(f"✓ Category group filter '{category}': searching in {len(subcategories)} subcategories: {qs.count()} projects")
+            else:
+                # Specific subcategory - exact match
+                qs = qs.filter(category=category)
+                print(f"✓ Category filter '{category}': {qs.count()} projects")
+
+        # ==========================================
+        # 8. EXPERIENCE LEVEL FILTER
+        # ==========================================
+        experience_level = params.get("experience_level", "").strip()
+        if experience_level:
+            exp_list = [e.strip() for e in experience_level.split(",") if e.strip()]
+            if exp_list:
+                qs = qs.filter(experience_level__in=exp_list)
+                print(f"✓ Experience filter {exp_list}: {qs.count()} projects")
+
+        # ==========================================
+        # 9. LOCATION TYPE FILTER
+        # ==========================================
+        location_type = params.get("location_type", "").strip()
+        if location_type:
+            loc_list = [l.strip() for l in location_type.split(",") if l.strip()]
+            if loc_list:
+                qs = qs.filter(location_type__in=loc_list)
+                print(f"✓ Location type filter {loc_list}: {qs.count()} projects")
+
+        # ==========================================
+        # 10. CLIENT LOCATION FILTER
+        # ==========================================
+        client_location = params.get("client_location", "").strip()
+        if client_location:
+            qs = qs.filter(client_location__icontains=client_location)
+            print(f"✓ Client location filter '{client_location}': {qs.count()} projects")
 
         # ==========================================
         # FINAL RESULT
@@ -213,10 +362,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         return qs
 
+   
     @action(detail=True, methods=['get'], url_path='proposals', permission_classes=[IsAuthenticated])
     def proposals(self, request, pk=None):
         project = self.get_object()
-
+        # By default, return all proposals for this project.
+        # (Optional: restrict non-owners to their own proposals only.)
         qs = project.proposals.select_related('freelancer').all()
         ser = ProposalSerializer(qs, many=True, context={'request': request})
         return Response(ser.data)

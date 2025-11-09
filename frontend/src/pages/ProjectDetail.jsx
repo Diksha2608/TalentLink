@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, Calendar, X, CheckCircle, MessageCircle, Trash2, User, MapPin, Star, Briefcase, Award, FileText } from 'lucide-react';
+import { DollarSign, Clock, Calendar, X, CheckCircle, MessageCircle, Trash2, User, MapPin, Star, Briefcase, Award, FileText, LogIn } from 'lucide-react';
 import { projectsAPI } from '../api/projects';
 import { proposalsAPI } from '../api/proposals';
 import { formatCurrency } from '../utils/currency';
@@ -43,6 +43,7 @@ export default function ProjectDetail({ user }) {
     estimated_time: '',
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadProject();
@@ -53,12 +54,26 @@ export default function ProjectDetail({ user }) {
     }
   }, [id, user]);
 
-  const loadProject = () => {
-    projectsAPI.get(id).then((res) => setProject(res.data));
+  const loadProject = async () => {
+    try {
+      setLoading(true);
+      const res = await projectsAPI.get(id);
+      setProject(res.data);
+    } catch (err) {
+      console.error('Failed to load project:', err);
+      setError('Failed to load project details');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadProposals = () => {
-    projectsAPI.getProposals(id).then((res) => setProposals(res.data));
+  const loadProposals = async () => {
+    try {
+      const res = await projectsAPI.getProposals(id);
+      setProposals(res.data);
+    } catch (err) {
+      console.error('Failed to load proposals:', err);
+    }
   };
 
   const handleDeleteProject = async () => {
@@ -72,18 +87,20 @@ export default function ProjectDetail({ user }) {
   };
 
   const handleChat = async (freelancerId) => {
+    if (!user) {
+      navigate('/signin');
+      return;
+    }
     try {
       const res = await messagesAPI.getOrCreateThreadWith(freelancerId);
       const threadId = res.data?.id || res.data?.thread?.id;
       if (threadId) {
         navigate(`/messages/${threadId}`);
       } else {
-        // Fallback: navigate to messages with user parameter
         navigate(`/messages?user=${freelancerId}`);
       }
     } catch (err) {
       console.error('Failed to start chat:', err);
-      // Fallback navigation
       navigate(`/messages?user=${freelancerId}`);
     }
   };
@@ -101,6 +118,20 @@ export default function ProjectDetail({ user }) {
 
   const handleSubmitProposal = async (e) => {
     e.preventDefault();
+    
+    // Check if user is logged in
+    if (!user) {
+      alert('Please sign in to submit a proposal');
+      navigate('/signin');
+      return;
+    }
+
+    // Check if user is a freelancer
+    if (user.role !== 'freelancer') {
+      alert('Only freelancers can submit proposals');
+      return;
+    }
+
     setError('');
 
     try {
@@ -138,8 +169,55 @@ export default function ProjectDetail({ user }) {
     }
   };
 
+  const handleProposalButtonClick = () => {
+    if (!user) {
+      navigate('/signin');
+      return;
+    }
+    if (user.role !== 'freelancer') {
+      alert('Only freelancers can submit proposals');
+      return;
+    }
+    setShowProposalModal(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+        <p className="mt-4 text-gray-600">Loading project details...</p>
+      </div>
+    );
+  }
+
+  if (error && !project) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-600 font-medium">{error}</p>
+          <button
+            onClick={() => navigate('/projects')}
+            className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          >
+            Back to Projects
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!project) {
-    return <div className="container mx-auto px-4 py-8">Loading...</div>;
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <p className="text-gray-600">Project not found</p>
+        <button
+          onClick={() => navigate('/projects')}
+          className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+        >
+          Back to Projects
+        </button>
+      </div>
+    );
   }
 
   const canSubmitProposal = user?.role === 'freelancer' && project.status === 'open' && !userProposal;
@@ -297,12 +375,41 @@ export default function ProjectDetail({ user }) {
             </div>
           )}
 
+          {/* Actions for Non-Logged-In Users or Non-Freelancers */}
+          {!user && project.status === 'open' && (
+            <div className="mt-6 border-t pt-6">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 text-center">
+                <LogIn className="mx-auto mb-3 text-blue-600" size={48} />
+                <h3 className="text-lg font-bold text-blue-900 mb-2">
+                  Interested in this project?
+                </h3>
+                <p className="text-blue-700 mb-4">
+                  Sign in as a freelancer to submit your proposal
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => navigate('/signin')}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => navigate('/signup')}
+                    className="px-6 py-3 bg-white border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Freelancer Actions */}
           {user?.role === 'freelancer' && (
             <div className="mt-6 border-t pt-6">
               {canSubmitProposal ? (
                 <button
-                  onClick={() => setShowProposalModal(true)}
+                  onClick={handleProposalButtonClick}
                   className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg"
                 >
                   Submit Proposal
@@ -340,10 +447,19 @@ export default function ProjectDetail({ user }) {
               )}
             </div>
           )}
+
+          {/* Client Role - Show message */}
+          {user?.role === 'client' && user.id !== project.client && (
+            <div className="mt-6 border-t pt-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                <p className="text-gray-700">This page is for project owners and freelancers.</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* PROPOSALS FOR CLIENT */}
-        {user?.role === 'client' && (
+        {user?.role === 'client' && user.id === project.client && (
           <div className="bg-white rounded-lg shadow-md p-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Proposals Received ({proposals.length})</h2>

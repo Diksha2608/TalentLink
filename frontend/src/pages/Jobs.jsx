@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, X, Clock, DollarSign, MapPin, Briefcase } from 'lucide-react';
-import { projectsAPI } from '../api/projects';
+import { Search, X, Clock, DollarSign, MapPin, Briefcase, Award, Calendar } from 'lucide-react';
+import { jobsAPI } from '../api/jobs'; 
 import { Link } from 'react-router-dom';
 
 const JOB_TYPES = [
   { value: 'hourly', label: 'Hourly' },
   { value: 'fixed', label: 'Fixed Price' },
-  { value: 'data_entry', label: 'Data Entry' },
-  { value: 'virtual_assistant', label: 'Virtual Assistant' },
 ];
 
 const EXPERIENCE_LEVEL = [
@@ -22,18 +20,24 @@ const POSTED_TIME = [
   { value: 'month', label: 'Last month' }
 ];
 
+const LOCATION_TYPE = [
+  { value: 'remote', label: 'Remote' },
+  { value: 'hybrid', label: 'Hybrid' },
+  { value: 'onsite', label: 'Onsite' }
+];
+
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // Filters
   const [jobTypes, setJobTypes] = useState([]);
   const [experienceLevel, setExperienceLevel] = useState([]);
   const [postedTime, setPostedTime] = useState('');
   const [minRate, setMinRate] = useState('');
   const [maxRate, setMaxRate] = useState('');
   const [location, setLocation] = useState('');
+  const [locationType, setLocationType] = useState([]);
 
   const handleCheckbox = (arr, setArr, v) => {
     setArr(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
@@ -46,6 +50,7 @@ export default function Jobs() {
     setMinRate('');
     setMaxRate('');
     setLocation('');
+    setLocationType([]);
     setSearchTerm('');
   };
 
@@ -55,7 +60,7 @@ export default function Jobs() {
 
   useEffect(() => {
     loadJobs();
-  }, [jobTypes, experienceLevel, postedTime, minRate, maxRate, location, searchTerm]);
+  }, [jobTypes, experienceLevel, postedTime, minRate, maxRate, location, locationType, searchTerm]);
 
   const loadJobs = () => {
     setLoading(true);
@@ -66,12 +71,13 @@ export default function Jobs() {
       experience_level: experienceLevel.join(','),
       posted_time: postedTime,
       location: location,
+      location_type: locationType.join(','),
     };
 
     if (minRate) params.hourly_min = minRate;
     if (maxRate) params.hourly_max = maxRate;
 
-    projectsAPI
+    jobsAPI
       .list(params)
       .then((res) => {
         const data = res.data.results || res.data;
@@ -82,6 +88,28 @@ export default function Jobs() {
         setJobs([]);
       })
       .finally(() => setLoading(false));
+  };
+
+  const formatJobType = (type) => {
+    return type === 'hourly' ? 'Hourly' : 'Fixed Price';
+  };
+
+  const formatExperience = (level) => {
+    const map = {
+      'entry': 'Entry Level',
+      'intermediate': 'Intermediate',
+      'expert': 'Expert'
+    };
+    return map[level] || level;
+  };
+
+  const formatLocationType = (type) => {
+    const map = {
+      'remote': 'Remote',
+      'hybrid': 'Hybrid',
+      'onsite': 'Onsite'
+    };
+    return map[type] || type;
   };
 
   return (
@@ -160,6 +188,27 @@ export default function Jobs() {
                     type="checkbox"
                     checked={experienceLevel.includes(o.value)}
                     onChange={() => handleCheckbox(experienceLevel, setExperienceLevel, o.value)}
+                    className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
+                  />
+                  <span className="text-sm text-gray-700">{o.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 my-4" />
+
+            {/* Location Type */}
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-gray-800 mb-3">Location Type</div>
+              {LOCATION_TYPE.map((o) => (
+                <label
+                  key={o.value}
+                  className="flex items-center ml-2 py-2 cursor-pointer hover:bg-purple-50 rounded px-2 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={locationType.includes(o.value)}
+                    onChange={() => handleCheckbox(locationType, setLocationType, o.value)}
                     className="mr-3 w-4 h-4 accent-purple-600 cursor-pointer"
                   />
                   <span className="text-sm text-gray-700">{o.label}</span>
@@ -248,36 +297,86 @@ export default function Jobs() {
                   {jobs.map((job) => (
                     <Link
                       key={job.id}
-                      to={`/projects/${job.id}`}
-                      className="block bg-white rounded-lg shadow-md p-5 hover:shadow-lg transition no-underline"
+                      to={`/jobs/${job.id}`}
+                      className="block bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition no-underline border-2 border-transparent hover:border-purple-400"
                     >
+                      {/* Header */}
                       <div className="flex justify-between items-start mb-3">
-                        <h3 className="text-lg font-semibold text-gray-900 hover:text-purple-600">{job.title}</h3>
-                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                          Open
-                        </span>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-bold text-gray-900 hover:text-purple-600 mb-2">
+                            {job.title}
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full border border-green-200">
+                              Open
+                            </span>
+                            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full border border-blue-200 capitalize">
+                              {formatJobType(job.job_type)}
+                            </span>
+                            <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full border border-amber-200">
+                              {formatExperience(job.experience_level)}
+                            </span>
+                            {job.location_type && (
+                              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200 capitalize">
+                                {formatLocationType(job.location_type)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {job.skills_required?.slice(0, 5).map((skill) => (
-                          <span key={skill.id} className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                            {skill.name}
+
+                      {/* Description */}
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
+                        {job.description}
+                      </p>
+
+                      {/* Job Details Grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        {/* Payment */}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1 text-gray-600 mb-1">
+                            <DollarSign size={16} className="text-green-600" />
+                            <span className="text-xs font-medium">Payment</span>
+                          </div>
+                          <span className="text-base font-bold text-green-600">
+                            {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
+                              ? `₹${job.hourly_min}-${job.hourly_max}/hr`
+                              : job.job_type === 'fixed' && job.fixed_amount
+                              ? `₹${job.fixed_amount}`
+                              : 'Not specified'}
                           </span>
-                        ))}
+                        </div>
+
+                        {/* Location */}
+                        {job.location && (
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1 text-gray-600 mb-1">
+                              <MapPin size={16} />
+                              <span className="text-xs font-medium">Location</span>
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {job.location}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Posted Date */}
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1 text-gray-600 mb-1">
+                            <Calendar size={16} />
+                            <span className="text-xs font-medium">Posted</span>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {new Date(job.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <DollarSign size={16} />
-                          <span>₹{job.budget_min} - ₹{job.budget_max}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock size={16} />
-                          <span>{job.duration_estimate?.replace('_', ' ')}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Briefcase size={16} />
-                          <span>{job.proposals_count || 0} proposals</span>
-                        </div>
+
+                      {/* Footer */}
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-500">
+                          Posted by: <span className="font-semibold text-gray-700">{job.client_name || 'Client'}</span>
+                        </p>
                       </div>
                     </Link>
                   ))}
