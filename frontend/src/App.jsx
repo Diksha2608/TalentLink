@@ -1,4 +1,4 @@
-// frontend/src/App.jsx 
+// frontend/src/App.jsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
@@ -18,6 +18,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { authAPI } from './api/auth';
 import PostProject from './pages/PostProject';
 import FreelancerProfile from './pages/FreelancerProfile';
+import ResetPassword from './pages/ResetPassword'; // ✅ Added new page
 import './App.css';
 
 function App() {
@@ -50,38 +51,83 @@ function App() {
         <Navbar user={user} setUser={setUser} />
         <main className="flex-1">
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<Landing user={user} />} />
             <Route path="/signup" element={<SignUp setUser={setUser} />} />
             <Route path="/signin" element={<SignIn setUser={setUser} />} />
+
+            {/* Password Reset route */}
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+
+            {/* Protected routes */}
             <Route
               path="/onboarding"
-              element={<ProtectedRoute user={user}><OnboardingWizard user={user} setUser={setUser} /></ProtectedRoute>}
+              element={
+                <ProtectedRoute user={user}>
+                  <OnboardingWizard user={user} setUser={setUser} />
+                </ProtectedRoute>
+              }
             />
             <Route path="/projects" element={<ProjectFeed user={user} />} />
             <Route
               path="/projects/:id"
-              element={<ProtectedRoute user={user}><ProjectDetail user={user} /></ProtectedRoute>}
+              element={
+                <ProtectedRoute user={user}>
+                  <ProjectDetail user={user} />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/client"
-              element={<ProtectedRoute user={user}><ClientDashboard user={user} /></ProtectedRoute>}
+              element={
+                <ProtectedRoute user={user}>
+                  <ClientDashboard user={user} />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/freelancer"
-              element={<ProtectedRoute user={user}><FreelancerDashboard user={user} /></ProtectedRoute>}
+              element={
+                <ProtectedRoute user={user}>
+                  <FreelancerDashboard user={user} />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/messages"
-              element={<ProtectedRoute user={user}><Messages user={user} /></ProtectedRoute>}
+              element={
+                <ProtectedRoute user={user}>
+                  <Messages user={user} />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/contracts"
-              element={<ProtectedRoute user={user}><Contracts user={user} /></ProtectedRoute>}
+              element={
+                <ProtectedRoute user={user}>
+                  <Contracts user={user} />
+                </ProtectedRoute>
+              }
             />
             <Route path="/test-api" element={<TestAPI />} />
-            <Route path="/projects/create" element={<ProtectedRoute user={user}><PostProject user={user} /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute user={user}><FreelancerProfile user={user} setUser={setUser} /></ProtectedRoute>} />
-            
+            <Route
+              path="/projects/create"
+              element={
+                <ProtectedRoute user={user}>
+                  <PostProject user={user} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute user={user}>
+                  <FreelancerProfile user={user} setUser={setUser} />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fallback route */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
@@ -90,4 +136,5 @@ function App() {
     </Router>
   );
 }
+
 export default App;

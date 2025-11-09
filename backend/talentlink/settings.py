@@ -1,30 +1,37 @@
-# backend/talentlink/settings.py
 import os
 from pathlib import Path
 from datetime import timedelta
 from decouple import config
+import dj_database_url
 
+# ================= BASE SETTINGS =================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ============= SECURITY =============
 SECRET_KEY = config('SECRET_KEY', default='your-secret-key-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1',
+    cast=lambda v: [s.strip() for s in v.split(',')]
+)
 
-# ============= INSTALLED APPS =============
+# ================= INSTALLED APPS =================
 INSTALLED_APPS = [
+    # Django core apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third-party
+
+    # Third-party apps
     'rest_framework',
+    'rest_framework_simplejwt',
     'corsheaders',
-    
-    # Local
+    'django_rest_passwordreset',  # ✅ For password reset support
+
+    # Local apps
     'users.apps.UsersConfig',
     'projects.apps.ProjectsConfig',
     'proposals.apps.ProposalsConfig',
@@ -32,6 +39,7 @@ INSTALLED_APPS = [
     'messaging.apps.MessagingConfig',
 ]
 
+# ================= MIDDLEWARE =================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -45,6 +53,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'talentlink.urls'
 
+# ================= TEMPLATES =================
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -63,9 +72,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'talentlink.wsgi.application'
 
-# ============= DATABASE =============
-import dj_database_url
-
+# ================= DATABASE =================
 if config('DATABASE_URL', default=None):
     DATABASES = {
         'default': dj_database_url.config(default=config('DATABASE_URL'), conn_max_age=600)
@@ -78,7 +85,7 @@ else:
         }
     }
 
-# ============= AUTH & JWT =============
+# ================= AUTH & PASSWORDS =================
 AUTH_USER_MODEL = 'users.User'
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -88,7 +95,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# ============= REST FRAMEWORK =============
+# ================= REST FRAMEWORK =================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -104,7 +111,7 @@ REST_FRAMEWORK = {
     ),
 }
 
-# ============= JWT SETTINGS =============
+# ================= JWT SETTINGS =================
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -117,30 +124,56 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-
 AUTHENTICATION_BACKENDS = [
     'users.authentication.EmailBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
-# ============= CORS =============
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:5173',
-    cast=lambda v: [s.strip() for s in v.split(',')]
-)
 
-# ============= INTERNATIONALIZATION =============
+# ================= CORS & CSRF =================
+CORS_ALLOW_ALL_ORIGINS = False  # safer than allowing all
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+]
+
+# ================= PASSWORD RESET SETTINGS =================
+DJANGO_REST_PASSWORDRESET = {
+    'RESET_PASSWORD_TOKEN_EXPIRY_TIME': 3600,
+    'PASSWORD_RESET_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
+    ),
+    'EMAIL_SUBJECT': 'Password Reset for Your Account',
+}
+
+# ================= EMAIL CONFIG (✅ REAL GMAIL SMTP) =================
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'talentlink58@gmail.com'  # <-- replace with your Gmail
+EMAIL_HOST_PASSWORD = 'qjygzwhmlzvripnv'  # <-- paste your App Password
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+# ================= FRONTEND URL (for Password Reset links) =================
+FRONTEND_URL = "http://localhost:5173"  # Or http://localhost:3000 depending on your React app port
+
+
+# ================= INTERNATIONALIZATION =================
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# ============= STATIC & MEDIA FILES =============
+# ================= STATIC & MEDIA FILES =================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-

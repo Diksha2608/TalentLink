@@ -6,15 +6,18 @@ from .models import FreelancerProfile, Skill
 
 User = get_user_model()
 
+
+# -----------------------------
+# ✅ Custom Email Token Serializer
+# -----------------------------
 class EmailTokenObtainSerializer(TokenObtainPairSerializer):
-    username_field = User.USERNAME_FIELD  # This is 'username' by default
-    
+    username_field = User.USERNAME_FIELD  # Default is 'username'
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Replace username field with email field
+        # Replace username with email field
         self.fields['email'] = serializers.EmailField(required=True)
         self.fields['password'] = serializers.CharField(write_only=True, required=True)
-        # Remove username field if it exists
         self.fields.pop('username', None)
 
     @classmethod
@@ -22,68 +25,80 @@ class EmailTokenObtainSerializer(TokenObtainPairSerializer):
         return super().get_token(user)
 
     def validate(self, attrs):
-        # Get email and password from the request
         email = attrs.get('email')
         password = attrs.get('password')
 
         if not email:
             raise AuthenticationFailed('Email is required.')
-        
         if not password:
             raise AuthenticationFailed('Password is required.')
 
-        # Find user by email
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             raise AuthenticationFailed('No account found with this email. Please register first.')
 
-        # Verify password
         if not user.check_password(password):
             raise AuthenticationFailed('Invalid password. Please try again.')
 
-        # Check if user is active
         if not user.is_active:
             raise AuthenticationFailed('This account has been disabled.')
 
-        # Generate refresh and access tokens
         refresh = self.get_token(user)
-
         data = {
             'refresh': str(refresh),
             'access': str(refresh.access_token),
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'role': user.role
+            }
         }
-
         return data
 
 
-# Rest of serializers...
+# -----------------------------
+# ✅ Skill Serializer
+# -----------------------------
 class SkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Skill
         fields = ['id', 'name', 'slug']
 
+
+# -----------------------------
+# ✅ User Serializer
+# -----------------------------
 class UserSerializer(serializers.ModelSerializer):
     profile_complete = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'role', 'avatar', 'bio', 'location', 'rating_avg', 'created_at', 'profile_complete']
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name',
+            'role', 'avatar', 'bio', 'location', 'rating_avg',
+            'created_at', 'profile_complete'
+        ]
         read_only_fields = ['id', 'created_at', 'rating_avg']
 
     def get_profile_complete(self, obj):
         if obj.role == 'freelancer':
             try:
                 profile = obj.freelancer_profile
-                has_skills = profile.skills.count() > 0
-                has_rate = profile.hourly_rate > 0
+                has_skills = profile.skills.exists()
+                has_rate = profile.hourly_rate and profile.hourly_rate > 0
                 has_bio = bool(obj.bio)
                 has_portfolio = bool(profile.portfolio)
                 return has_skills and has_rate and has_bio and has_portfolio
-            except:
+            except FreelancerProfile.DoesNotExist:
                 return False
         return True
 
+
+# -----------------------------
+# ✅ Freelancer Profile Serializer (Fixed for “Skip” case)
+# -----------------------------
 class FreelancerProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     skills = SkillSerializer(many=True, read_only=True)
@@ -104,13 +119,41 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'total_earnings', 'projects_completed']
 
+    def validate(self, data):
+        """
+        Allow empty skills and other optional fields (for Skip button)
+        """
+        data['hourly_rate'] = data.get('hourly_rate', 0) or 0
+        return data
+
+    def update(self, instance, validated_data):
+        """
+        Safely handle partial updates (skip fields)
+        """
+        skills = validated_data.pop('skills', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if skills is not None:
+            instance.skills.set(skills)
+
+        instance.save()
+        return instance
+
+
+# -----------------------------
+# ✅ User Registration Serializer
+# -----------------------------
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8, style={'input_type': 'password'})
     password2 = serializers.CharField(write_only=True, min_length=8, style={'input_type': 'password'})
 
     class Meta:
         model = User
-        fields = ['email', 'username', 'first_name', 'last_name', 'password', 'password2', 'role']
+        fields = [
+            'email', 'username', 'first_name', 'last_name',
+            'password', 'password2', 'role'
+        ]
 
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
@@ -130,13 +173,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('password2')
         password = validated_data.pop('password')
-        
         user = User.objects.create(**validated_data)
         user.set_password(password)
         user.save()
-        
-        # Auto-create freelancer profile with default values
+
+        # Auto-create freelancer profile
         if user.role == 'freelancer':
             FreelancerProfile.objects.create(user=user, hourly_rate=0)
-        
+
         return user
