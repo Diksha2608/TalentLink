@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, DollarSign, FileText, TrendingUp, User, CheckCircle, AlertCircle, Edit, Edit2 } from 'lucide-react';
+import { Briefcase, DollarSign, FileText, TrendingUp, User, CheckCircle, AlertCircle, Edit, Edit2, Layers } from 'lucide-react';
 import { authAPI } from '../api/auth';
+import { jobApplicationsAPI } from '../api/jobApplications';
 
 const DashboardCard = ({ title, value, icon: Icon, color, isCurrency }) => {
   const colorClasses = {
@@ -34,6 +35,8 @@ export default function FreelancerDashboard({ user }) {
     completedProjects: 0,
   });
   const [proposals, setProposals] = useState([]);
+  const [jobApplications, setJobApplications] = useState([]);
+  const [activeTab, setActiveTab] = useState('projects');
   const [contracts, setContracts] = useState([]);
   const [profileCompletion, setProfileCompletion] = useState(45);
   const [missingItems, setMissingItems] = useState([
@@ -57,7 +60,7 @@ export default function FreelancerDashboard({ user }) {
         const prof = await authAPI.getFreelancerProfile();
         const p = prof.data || {};
         
-        let prop = [], contr = [];
+        let prop = [], contr = [], jobApps = [];
         
         // Fetch proposals
         if (authAPI.getMyProposals) {
@@ -69,6 +72,15 @@ export default function FreelancerDashboard({ user }) {
           } catch (err) {
             console.error('Error fetching proposals:', err);
           }
+        }
+        
+        // Fetch job applications
+        try {
+          const r = await jobApplicationsAPI.list();
+          jobApps = Array.isArray(r.data) ? r.data : (r.data?.results || []);
+          console.log('Job applications fetched:', jobApps);
+        } catch (err) {
+          console.error('Error fetching job applications:', err);
         }
         
         // Fetch contracts
@@ -87,10 +99,11 @@ export default function FreelancerDashboard({ user }) {
         
         
         setProposals(Array.isArray(prop) ? prop : []);
+        setJobApplications(Array.isArray(jobApps) ? jobApps : []);
         setContracts(Array.isArray(contr) ? contr : []);
         setStats({
           activeJobs: contr.filter(c => c.status === 'active').length || 0,
-          proposalsSent: prop.length || 0,
+          proposalsSent: (prop.length + jobApps.length) || 0,
           earnings: p.total_earnings || 0,
           completedProjects: p.projects_completed || 0,
         });
@@ -234,51 +247,129 @@ export default function FreelancerDashboard({ user }) {
 
         {/* Two Column Content */}
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 mb-6">
-          {/* Proposals */}
+          {/* Proposals / Job Applications */}
           <div className="bg-white rounded-xl shadow p-4 sm:p-5 hover:shadow-lg transition">
             <div className="flex justify-between items-center mb-3">
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Recent Proposals</h2>
-              <Link to="/projects" className="text-xs text-purple-600 hover:underline font-medium whitespace-nowrap">
-                Browse →
-              </Link>
-            </div>
-            {Array.isArray(proposals) && proposals.length > 0 ? (
-              <div className="space-y-3">
-                {proposals.slice(0, 5).map((proposal) => (
-                  <Link
-                    key={proposal.id}
-                    to={`/projects/${proposal.project_id || proposal.project}`}
-                    className="block border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:shadow-md transition cursor-pointer"
-                  >
-                    <h3 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1 line-clamp-1">
-                      {proposal.project_title || 'Untitled Project'}
-                    </h3>
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                      <span className="text-xs sm:text-sm text-gray-600 font-medium">
-                        ₹{Number(proposal.bid_amount || 0).toLocaleString()}
-                      </span>
-                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
-                        proposal.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                        proposal.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {proposal.status}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 sm:py-12">
-                <FileText className="mx-auto text-gray-300 mb-2" size={36} />
-                <p className="text-gray-600 mb-3 text-sm">No proposals yet</p>
-                <Link 
-                  to="/projects" 
-                  className="inline-block px-4 sm:px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm shadow-md"
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Layers size={20} className="text-purple-600" />
+                My Applications
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTab('projects')}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${
+                    activeTab === 'projects'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
                 >
-                  Browse Projects
-                </Link>
+                  Projects ({proposals.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('jobs')}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${
+                    activeTab === 'jobs'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Jobs ({jobApplications.length})
+                </button>
               </div>
+            </div>
+            
+            {activeTab === 'projects' ? (
+              <>
+                {Array.isArray(proposals) && proposals.length > 0 ? (
+                  <div className="space-y-3">
+                    {proposals.slice(0, 5).map((proposal) => (
+                      <Link
+                        key={proposal.id}
+                        to={`/projects/${proposal.project_id || proposal.project}`}
+                        className="block border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:shadow-md transition cursor-pointer"
+                      >
+                        <h3 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1 line-clamp-1">
+                          {proposal.project_title || 'Untitled Project'}
+                        </h3>
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                          <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                            ₹{Number(proposal.bid_amount || 0).toLocaleString()}
+                          </span>
+                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
+                            proposal.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            proposal.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {proposal.status}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                    {proposals.length > 5 && (
+                      <Link to="/proposals" className="block text-center text-sm text-purple-600 hover:underline py-2">
+                        View all {proposals.length} proposals →
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <FileText className="mx-auto text-gray-300 mb-2" size={36} />
+                    <p className="text-gray-600 mb-3 text-sm">No project proposals yet</p>
+                    <Link 
+                      to="/projects" 
+                      className="inline-block px-4 sm:px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm shadow-md"
+                    >
+                      Browse Projects
+                    </Link>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {Array.isArray(jobApplications) && jobApplications.length > 0 ? (
+                  <div className="space-y-3">
+                    {jobApplications.slice(0, 5).map((app) => (
+                      <Link
+                        key={app.id}
+                        to={`/jobs/${app.job_id || app.job}`}
+                        className="block border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:shadow-md transition cursor-pointer"
+                      >
+                        <h3 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1 line-clamp-1">
+                          {app.job_title || 'Untitled Job'}
+                        </h3>
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                          <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                            ₹{Number(app.bid_amount || 0).toLocaleString()}
+                          </span>
+                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
+                            app.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            app.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                    {jobApplications.length > 5 && (
+                      <p className="text-center text-sm text-purple-600 py-2">
+                        {jobApplications.length - 5} more job applications
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <FileText className="mx-auto text-gray-300 mb-2" size={36} />
+                    <p className="text-gray-600 mb-3 text-sm">No job applications yet</p>
+                    <Link 
+                      to="/jobs" 
+                      className="inline-block px-4 sm:px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm shadow-md"
+                    >
+                      Browse Jobs
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

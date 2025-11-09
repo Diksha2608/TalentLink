@@ -13,6 +13,7 @@ from contracts.views import ContractViewSet, ReviewViewSet
 from messaging.views import MessageViewSet
 from users.views import ClientProfileViewSet  
 from notifications.views import NotificationViewSet
+from jobs.views import JobViewSet, JobApplicationViewSet 
 
 def api_root(request):
     return JsonResponse({
@@ -38,6 +39,8 @@ router.register(r'contracts', ContractViewSet, basename='contract')
 router.register(r'reviews', ReviewViewSet, basename='review')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'notifications', NotificationViewSet, basename='notification')
+router.register(r'job-applications', JobApplicationViewSet, basename='job-application') 
+router.register(r'jobs', JobViewSet, basename='job')
 
 urlpatterns = [
     path('', api_root, name='api-root'),
@@ -45,9 +48,10 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/token/', EmailTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-        # ADD THESE TWO LINES
+     
     path('api/messages/', include('messaging.urls')),  # ← Messages with custom URLs
-    path('api/jobs/', include('jobs.urls')),  # ← Jobs routing
+    path('api/jobs/', include('jobs.urls')),
+      
 ]
 
 if settings.DEBUG:

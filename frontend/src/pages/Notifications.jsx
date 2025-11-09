@@ -36,72 +36,79 @@ export default function Notifications() {
     }
   };
 
-    const markReadAndGo = async (notif) => {
+  const markReadAndGo = async (notif) => {
     try {
-        if (!notif.is_read) {
+      if (!notif.is_read) {
         await notificationsAPI.markRead(notif.id);
         setItems((prev) =>
-            prev.map((n) =>
+          prev.map((n) =>
             n.id === notif.id ? { ...n, is_read: true } : n
-            )
+          )
         );
-        }
+      }
     } catch (err) {
-        console.error('Failed to mark notification read:', err);
+      console.error('Failed to mark notification read:', err);
     }
 
     const meta = notif.metadata || {};
 
-        if (notif.type === 'message') {
-        // if backend sends a thread id, jump straight there
-        if (meta.thread_id) {
-            navigate(`/messages/${meta.thread_id}`);
-            setNotificationsOpen(false);
-            return;
-        }
-        // else create/open a DM with the sender/partner
-        if (meta.conversation_user_id) {
-            try {
-            const res = await messagesAPI.getOrCreateThreadWith(meta.conversation_user_id);
-            const threadId = res.data?.id || res.data?.thread?.id;
-            if (threadId) {
-                navigate(`/messages/${threadId}`);
-            } else {
-                navigate('/messages');
-            }
-            } catch {
-            navigate('/messages');
-            }
-        } else {
-            navigate('/messages');
-        }
-        setNotificationsOpen(false);
+    if (notif.type === 'message') {
+      // if backend sends a thread id, jump straight there
+      if (meta.thread_id) {
+        navigate(`/messages/${meta.thread_id}`);
         return;
-        
-
+      }
+      // else create/open a DM with the sender/partner
+      if (meta.conversation_user_id) {
+        try {
+          const res = await messagesAPI.getOrCreateThreadWith(meta.conversation_user_id);
+          const threadId = res.data?.id || res.data?.thread?.id;
+          if (threadId) {
+            navigate(`/messages/${threadId}`);
+          } else {
+            navigate('/messages');
+          }
+        } catch {
+          navigate('/messages');
+        }
+      } else {
+        navigate('/messages');
+      }
+      return;
     } else if (notif.type === 'proposal') {
-        if (meta.proposal_id) {
+      if (meta.proposal_id) {
         navigate(`/proposals/${meta.proposal_id}`);
-        } else if (meta.project_id) {
+      } else if (meta.project_id) {
         navigate(`/projects/${meta.project_id}`);
-        } else {
+      } else {
         navigate('/proposals');
-        }
+      }
+    } else if (notif.type === 'job_application') {
+      // Handle job application notifications
+      if (meta.application_id) {
+        // For now, navigate to the job detail page
+        // Later you can create a dedicated application detail page
+        navigate(`/jobs/${meta.job_id}`);
+      } else if (meta.job_id) {
+        navigate(`/jobs/${meta.job_id}`);
+      } else {
+        navigate('/jobs');
+      }
     } else if (notif.type === 'contract') {
-        if (meta.contract_id) {
+      if (meta.contract_id) {
         navigate(`/contracts/${meta.contract_id}`);
-        // or `/contracts?contract=${meta.contract_id}` depending on how you render
-        } else {
+      } else {
         navigate('/contracts');
-        }
+      }
     } else {
-        navigate('/notifications');
+      navigate('/notifications');
     }
-    };
+  };
 
   const iconFor = (type) => {
     if (type === 'message') return <Mail size={18} className="text-purple-600" />;
     if (type === 'proposal') return <FileText size={18} className="text-blue-600" />;
+    if (type === 'job_application') return <Briefcase size={18} className="text-orange-600" />;
     if (type === 'contract') return <Briefcase size={18} className="text-green-600" />;
     return <Bell size={18} className="text-gray-500" />;
   };

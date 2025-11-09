@@ -1,7 +1,11 @@
+// frontend/src/pages/JobDetail.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DollarSign, Clock, Calendar, MapPin, Award, Briefcase, LogIn, Trash2 } from 'lucide-react';
 import { jobsAPI } from '../api/jobs';
+import { jobApplicationsAPI } from '../api/jobApplications';
+import JobApplicationForm from '../components/JobApplicationForm';
+import { CheckCircle } from 'lucide-react';
 
 const EXPERIENCE_MAP = {
   entry: 'Entry Level',
@@ -21,10 +25,16 @@ export default function JobDetail({ user }) {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [userApplication, setUserApplication] = useState(null);
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadJob();
-  }, [id]);
+    if (user?.role === 'freelancer') {
+      checkUserApplication();
+    }
+  }, [id, user]);
 
   const loadJob = async () => {
     try {
@@ -39,6 +49,26 @@ export default function JobDetail({ user }) {
     }
   };
 
+  // Check if THIS user has already applied to THIS job
+  const checkUserApplication = async () => {
+    try {
+      const response = await jobApplicationsAPI.list();
+      const list = response.data.results || response.data || [];
+      // common backends use fields like applicant, freelancer, or user — check safely
+      const parsedId = parseInt(id, 10);
+      const myApp = list.find(
+        (app) =>
+          app.job === parsedId &&
+          (app.applicant === user?.id ||
+            app.freelancer === user?.id ||
+            app.user === user?.id)
+      ) || null;
+      setUserApplication(myApp);
+    } catch (err) {
+      console.error('Failed to check application:', err);
+    }
+  };
+
   const handleDeleteJob = async () => {
     if (!window.confirm('Delete this job? This cannot be undone.')) return;
     try {
@@ -46,6 +76,20 @@ export default function JobDetail({ user }) {
       navigate('/dashboard/client');
     } catch {
       alert('Failed to delete job');
+    }
+  };
+
+  const handleSubmitApplication = async (formData) => {
+    try {
+      setSubmitting(true);
+      await jobApplicationsAPI.create(formData);
+      setShowApplicationModal(false);
+      await checkUserApplication();
+      alert('Application submitted successfully!');
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to submit application');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -58,8 +102,7 @@ export default function JobDetail({ user }) {
       alert('Only freelancers can apply to jobs');
       return;
     }
-
-    alert('Job application feature coming soon!');
+    setShowApplicationModal(true);
   };
 
   if (loading) {
@@ -256,12 +299,30 @@ export default function JobDetail({ user }) {
           {/* Freelancer Actions */}
           {user?.role === 'freelancer' && job.status === 'open' && (
             <div className="mt-6 border-t pt-6">
-              <button
-                onClick={handleApplyClick}
-                className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg"
-              >
-                Apply for this Job
-              </button>
+              {!userApplication ? (
+                <button
+                  onClick={handleApplyClick}
+                  className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg"
+                >
+                  Apply for this Job
+                </button>
+              ) : (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <CheckCircle className="text-blue-600" size={28} />
+                    <span className="font-bold text-blue-900 text-lg">Application Submitted</span>
+                  </div>
+                  <p className="text-blue-700 mb-3 text-base">
+                    Status: <span className="font-semibold capitalize">{userApplication.status}</span>
+                  </p>
+                  <button
+                    onClick={() => navigate('/jobs')}
+                    className="text-blue-600 hover:underline font-medium"
+                  >
+                    Browse Other Jobs →
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -275,6 +336,16 @@ export default function JobDetail({ user }) {
           )}
         </div>
       </div>
+
+
+      {showApplicationModal && (
+        <JobApplicationForm
+          job={job}
+          onSubmit={handleSubmitApplication}
+          onClose={() => setShowApplicationModal(false)}
+          isLoading={submitting}
+        />
+      )}
     </div>
   );
 }

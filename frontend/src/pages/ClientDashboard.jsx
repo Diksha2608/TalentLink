@@ -1,9 +1,10 @@
 // frontend/src/pages/ClientDashboard.jsx
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Briefcase, FileText, CheckCircle, Users, DollarSign, Clock, MapPin, Award } from 'lucide-react';
+import { Briefcase, FileText, CheckCircle, Users, DollarSign, Clock, MapPin, Award, Layers } from 'lucide-react';
 import DashboardCard from '../components/DashboardCard';
 import { projectsAPI } from '../api/projects';
+import { jobsAPI } from '../api/jobs';
 import { contractsAPI } from '../api/contracts';
 
 export default function ClientDashboard({ user }) {
@@ -14,10 +15,13 @@ export default function ClientDashboard({ user }) {
     completedProjects: 0,
   });
   const [projects, setProjects] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [activeTab, setActiveTab] = useState('projects');
   const navigate = useNavigate();
 
   useEffect(() => {
     loadDashboardData();
+
   }, []);
 
   const loadDashboardData = async () => {
@@ -25,25 +29,37 @@ export default function ClientDashboard({ user }) {
       // Get all projects
       const projectsRes = await projectsAPI.list();
       const allProjects = projectsRes.data.results || projectsRes.data;
-      
+
       // Filter to show only current user's projects
-      const myProjects = allProjects.filter(p => p.client === user.id);
-      
+      const myProjects = allProjects.filter((p) => p.client === user.id);
+
       setProjects(myProjects);
-      
+
       const totalProposals = myProjects.reduce((sum, p) => sum + (p.proposal_count || 0), 0);
-      
+
+      // Get all jobs
+      const jobsRes = await jobsAPI.list();
+      const allJobs = jobsRes.data.results || jobsRes.data;
+
+      // Filter to show only current user's jobs
+      const myJobs = allJobs.filter((j) => j.client === user.id);
+      setJobs(myJobs);
+
       setStats({
-        totalProjects: myProjects.length,
-        activeProjects: myProjects.filter((p) => p.status === 'open' || p.status === 'in_progress').length,
+        totalProjects: myProjects.length + myJobs.length,
+        activeProjects:
+          myProjects.filter((p) => p.status === 'open' || p.status === 'in_progress').length +
+          myJobs.filter((j) => j.status === 'open' || j.status === 'in_progress').length,
         totalProposals,
-        completedProjects: myProjects.filter((p) => p.status === 'completed').length,
+        completedProjects:
+          myProjects.filter((p) => p.status === 'completed').length +
+          myJobs.filter((j) => j.status === 'completed').length,
       });
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     }
   };
-  
+
   const handleCreateProject = () => {
     navigate('/projects/create');
   };
@@ -106,136 +122,148 @@ export default function ClientDashboard({ user }) {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-semibold mb-4">Your Projects</h2>
-          {projects.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map((project) => (
-                <Link
-                  key={project.id}
-                  to={`/projects/${project.id}`}
-                  className="block border-2 border-gray-200 rounded-xl p-5 hover:border-purple-400 hover:shadow-lg transition-all"
-                >
-                  {/* Header */}
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-bold text-lg text-gray-900 line-clamp-2 flex-1 pr-2">
-                      {project.title}
-                    </h3>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusColor(
-                        project.status
-                      )}`}
-                    >
-                      {project.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
+          <div className="flex items-center justify-between mb-6 border-b pb-4">
+            <h2 className="text-2xl font-semibold">Your Postings</h2>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setActiveTab('projects')}
+                className={`px-4 py-2 font-semibold rounded-lg transition flex items-center gap-2 ${
+                  activeTab === 'projects' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Layers size={16} />
+                Projects ({projects.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('jobs')}
+                className={`px-4 py-2 font-semibold rounded-lg transition flex items-center gap-2 ${
+                  activeTab === 'jobs' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Briefcase size={16} />
+                Jobs ({jobs.length})
+              </button>
+            </div>
+          </div>
 
-                  {/* Category */}
-                  {project.category && (
-                    <div className="mb-3">
-                      <span className="inline-block px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                        {project.category}
+          {activeTab === 'projects' ? (
+            // PROJECTS VIEW
+            projects.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {projects.map((project) => (
+                  <Link
+                    key={project.id}
+                    to={`/projects/${project.id}`}
+                    className="block border-2 border-gray-200 rounded-xl p-5 hover:border-purple-400 hover:shadow-lg transition-all"
+                  >
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-bold text-lg text-gray-900 line-clamp-2 flex-1 pr-2">{project.title}</h3>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusColor(
+                          project.status
+                        )}`}
+                      >
+                        {project.status.replace('_', ' ').toUpperCase()}
                       </span>
                     </div>
-                  )}
 
-                  {/* Description */}
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+                    {/* Category */}
+                    {project.category && (
+                      <div className="mb-3">
+                        <span className="inline-block px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                          {project.category}
+                        </span>
+                      </div>
+                    )}
 
-                  {/* Skills */}
-                  {project.skills_required && project.skills_required.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      {project.skills_required.slice(0, 3).map((skill) => (
-                        <span
-                          key={skill.id}
-                          className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full"
-                        >
-                          {skill.name}
-                        </span>
-                      ))}
-                      {project.skills_required.length > 3 && (
-                        <span className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                          +{project.skills_required.length - 3} more
-                        </span>
+                    {/* Description */}
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+
+                    {/* Skills */}
+                    {project.skills_required && project.skills_required.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        {project.skills_required.slice(0, 3).map((skill) => (
+                          <span
+                            key={skill.id}
+                            className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full"
+                          >
+                            {skill.name}
+                          </span>
+                        ))}
+                        {project.skills_required.length > 3 && (
+                          <span className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                            +{project.skills_required.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Info Grid */}
+                    <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg">
+                      {/* Budget */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1.5 text-gray-600">
+                          <DollarSign size={14} />
+                          <span className="font-medium">Budget:</span>
+                        </div>
+                        <span className="font-bold text-gray-900">{formatBudget(project)}</span>
+                      </div>
+
+                      {/* Experience Level */}
+                      {project.experience_level && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <Award size={14} />
+                            <span className="font-medium">Level:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900 capitalize">{project.experience_level}</span>
+                        </div>
+                      )}
+
+                      {/* Location Type */}
+                      {project.location_type && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <MapPin size={14} />
+                            <span className="font-medium">Type:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900 capitalize">{project.location_type}</span>
+                        </div>
+                      )}
+
+                      {/* Duration */}
+                      {project.duration && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <Clock size={14} />
+                            <span className="font-medium">Duration:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900">
+                            {project.duration.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                          </span>
+                        </div>
                       )}
                     </div>
-                  )}
 
-                  {/* Info Grid */}
-                  <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg">
-                    {/* Budget */}
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1.5 text-gray-600">
-                        <DollarSign size={14} />
-                        <span className="font-medium">Budget:</span>
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                        <Users size={14} />
+                        <span className="font-semibold text-gray-900">{project.proposal_count || 0}</span>
+                        <span>proposals</span>
                       </div>
-                      <span className="font-bold text-gray-900">{formatBudget(project)}</span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(project.created_at).toLocaleDateString()}
+                      </span>
                     </div>
-
-                    {/* Experience Level */}
-                    {project.experience_level && (
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1.5 text-gray-600">
-                          <Award size={14} />
-                          <span className="font-medium">Level:</span>
-                        </div>
-                        <span className="font-semibold text-gray-900 capitalize">
-                          {project.experience_level}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Location Type */}
-                    {project.location_type && (
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1.5 text-gray-600">
-                          <MapPin size={14} />
-                          <span className="font-medium">Type:</span>
-                        </div>
-                        <span className="font-semibold text-gray-900 capitalize">
-                          {project.location_type}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Duration */}
-                    {project.duration && (
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1.5 text-gray-600">
-                          <Clock size={14} />
-                          <span className="font-medium">Duration:</span>
-                        </div>
-                        <span className="font-semibold text-gray-900">
-                          {project.duration.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                    <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <Users size={14} />
-                      <span className="font-semibold text-gray-900">{project.proposal_count || 0}</span>
-                      <span>proposals</span>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(project.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-600 mb-4">You haven't posted any projects yet.</p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={handleCreateJob}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                >
-                  Post Your First Job
-                </button>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-600 mb-4">You haven't posted any projects yet.</p>
                 <button
                   onClick={handleCreateProject}
                   className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
@@ -243,7 +271,103 @@ export default function ClientDashboard({ user }) {
                   Post Your First Project
                 </button>
               </div>
-            </div>
+            )
+          ) : (
+            // JOBS VIEW
+            jobs.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {jobs.map((job) => (
+                  <Link
+                    key={job.id}
+                    to={`/jobs/${job.id}`}
+                    className="block border-2 border-gray-200 rounded-xl p-5 hover:border-purple-400 hover:shadow-lg transition-all"
+                  >
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-bold text-lg text-gray-900 line-clamp-2 flex-1 pr-2">{job.title}</h3>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${getStatusColor(
+                          job.status
+                        )}`}
+                      >
+                        {job.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Job Type Badge */}
+                    <div className="mb-3">
+                      <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium capitalize">
+                        {job.job_type === 'hourly' ? 'Hourly' : 'Fixed Price'}
+                      </span>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+
+                    {/* Info Grid */}
+                    <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg">
+                      {/* Payment */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1.5 text-gray-600">
+                          <DollarSign size={14} />
+                          <span className="font-medium">Payment:</span>
+                        </div>
+                        <span className="font-bold text-green-600">
+                          {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
+                            ? `₹${job.hourly_min}-${job.hourly_max}/hr`
+                            : job.job_type === 'fixed' && job.fixed_amount
+                            ? `₹${job.fixed_amount}`
+                            : 'Not specified'}
+                        </span>
+                      </div>
+
+                      {/* Experience Level */}
+                      {job.experience_level && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <Award size={14} />
+                            <span className="font-medium">Level:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900 capitalize">{job.experience_level}</span>
+                        </div>
+                      )}
+
+                      {/* Location Type */}
+                      {job.location_type && (
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <MapPin size={14} />
+                            <span className="font-medium">Type:</span>
+                          </div>
+                          <span className="font-semibold text-gray-900 capitalize">{job.location_type}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                        <Users size={14} />
+                        <span className="font-semibold text-gray-900">0</span>
+                        <span>applications</span>
+                      </div>
+                      <span className="text-xs text-gray-500">{new Date(job.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-600 mb-4">You haven't posted any jobs yet.</p>
+                <button
+                  onClick={handleCreateJob}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Post Your First Job
+                </button>
+              </div>
+            )
           )}
         </div>
       </div>
