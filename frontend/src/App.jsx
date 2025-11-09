@@ -22,7 +22,10 @@ import ResetPassword from './pages/ResetPassword'; // ✅ Added new page
 import './App.css';
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const cached = localStorage.getItem('user');
+    return cached ? JSON.parse(cached) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,10 +33,14 @@ function App() {
     if (token) {
       authAPI
         .me()
-        .then((res) => setUser(res.data))
+        .then((res) => {
+          setUser(res.data);
+          localStorage.setItem('user', JSON.stringify(res.data));
+        })
         .catch(() => {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
         })
         .finally(() => setLoading(false));
     } else {
@@ -42,7 +49,11 @@ function App() {
   }, []);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        Loading...
+      </div>
+    );
   }
 
   return (

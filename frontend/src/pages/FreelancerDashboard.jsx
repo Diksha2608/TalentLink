@@ -1,10 +1,30 @@
-// frontend/src/pages/FreelancerDashboard.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, DollarSign, FileText, TrendingUp } from 'lucide-react';
-import DashboardCard from '../components/DashboardCard';
-import { proposalsAPI } from '../api/proposals';
-import { contractsAPI } from '../api/contracts';
+import { Briefcase, DollarSign, FileText, TrendingUp, User, CheckCircle, AlertCircle, Edit, Edit2 } from 'lucide-react';
+import { authAPI } from '../api/auth';
+
+const DashboardCard = ({ title, value, icon: Icon, color, isCurrency }) => {
+  const colorClasses = {
+    purple: 'bg-purple-100 text-purple-600',
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-green-100 text-green-600',
+    orange: 'bg-orange-100 text-orange-600',
+  };
+  
+  return (
+    <div className="bg-white rounded-xl shadow p-3 sm:p-4 hover:shadow-lg transition">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] sm:text-xs text-gray-600 font-medium truncate pr-2">{title}</p>
+        <div className={`p-1.5 sm:p-2 rounded-lg ${colorClasses[color]} flex-shrink-0`}>
+          <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
+        </div>
+      </div>
+      <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+        {isCurrency ? `₹${Number(value || 0).toLocaleString()}` : value}
+      </p>
+    </div>
+  );
+};
 
 export default function FreelancerDashboard({ user }) {
   const [stats, setStats] = useState({
@@ -15,101 +35,336 @@ export default function FreelancerDashboard({ user }) {
   });
   const [proposals, setProposals] = useState([]);
   const [contracts, setContracts] = useState([]);
+  const [profileCompletion, setProfileCompletion] = useState(45);
+  const [missingItems, setMissingItems] = useState([
+    'Bio (50+ chars)',
+    'Location',
+    'Professional title',
+    'Hourly rate'
+  ]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    let mounted = true;
+    
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch profile
+        const prof = await authAPI.getFreelancerProfile();
+        const p = prof.data || {};
+        
+        let prop = [], contr = [];
+        
+        // Fetch proposals
+        if (authAPI.getMyProposals) {
+          try { 
+            const r = await authAPI.getMyProposals(); 
+           
+            prop = Array.isArray(r.data) ? r.data : (r.data?.results || []);
+            console.log('Proposals fetched:', prop); 
+          } catch (err) {
+            console.error('Error fetching proposals:', err);
+          }
+        }
+        
+        // Fetch contracts
+        if (authAPI.getMyContracts) {
+          try { 
+            const r = await authAPI.getMyContracts(); 
+           
+            contr = Array.isArray(r.data) ? r.data : (r.data?.results || []);
+            console.log('Contracts fetched:', contr); 
+          } catch (err) {
+            console.error('Error fetching contracts:', err);
+          }
+        }
+        
+        if (!mounted) return;
+        
+        
+        setProposals(Array.isArray(prop) ? prop : []);
+        setContracts(Array.isArray(contr) ? contr : []);
+        setStats({
+          activeJobs: contr.filter(c => c.status === 'active').length || 0,
+          proposalsSent: prop.length || 0,
+          earnings: p.total_earnings || 0,
+          completedProjects: p.projects_completed || 0,
+        });
+        
+        // Profile completion calculation
+        const socials = p.social_links || {};
+        const socialFilled = Boolean(socials.linkedin || socials.github || socials.website || socials.other);
+        const portfolioFiles = p.portfolio_files || [];
 
-  const loadDashboardData = async () => {
-    try {
-      const proposalsRes = await proposalsAPI.list();
-      const contractsRes = await contractsAPI.list();
-      
-      setProposals(proposalsRes.data.results || proposalsRes.data);
-      setContracts(contractsRes.data.results || contractsRes.data);
+        const checks = [
+          Boolean(user?.avatar),
+          Boolean(user?.bio && user.bio.length >= 50),
+          Boolean(user?.location),
+          Boolean(p.role_title),
+          Number(p.hourly_rate) > 0,
+          (p.skills || []).length > 0,
+          (p.languages || []).length > 0,
+          (p.experiences || []).length > 0,
+          (p.education || []).length > 0,
+          socialFilled,
+          (portfolioFiles || []).length > 0,
+        ];
+        
+        const total = checks.length;
+        const done = checks.filter(Boolean).length;
+        setProfileCompletion(Math.round((done / total) * 100));
 
-      setStats({
-        activeJobs: contractsRes.data.filter((c) => c.status === 'active').length,
-        proposalsSent: proposalsRes.data.length,
-        earnings: user.freelancer_profile?.total_earnings || 0,
-        completedProjects: user.freelancer_profile?.projects_completed || 0,
-      });
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
-    }
-  };
+        const missing = [];
+        if (!checks[0]) missing.push('Profile photo');
+        if (!checks[1]) missing.push('Bio (50+ chars)');
+        if (!checks[2]) missing.push('Location');
+        if (!checks[3]) missing.push('Professional title');
+        if (!checks[4]) missing.push('Hourly rate');
+        if (!checks[5]) missing.push('Add at least 1 skill');
+        if (!checks[6]) missing.push('Languages');
+        if (!checks[7]) missing.push('Experience');
+        if (!checks[8]) missing.push('Education');
+        if (!checks[9]) missing.push('Social links');
+        if (!checks[10]) missing.push('Portfolio files');
+        setMissingItems(missing);
+        
+      } catch (err) {
+        console.error('Dashboard fetch error:', err);
+        if (mounted) setError('Failed to load dashboard data');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    
+    fetchData();
+    return () => { mounted = false; };
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        <h1 className="text-4xl font-bold mb-8">Freelancer Dashboard</h1>
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-5 px-3 sm:px-4">
+      <div className="container mx-auto max-w-7xl">
+        <h1 className="text-xl sm:text-2xl font-extrabold mb-4 sm:mb-5 text-gray-900">
+          Freelancer Dashboard
+        </h1>
 
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <DashboardCard title="Active Jobs" value={stats.activeJobs} icon={Briefcase} color="purple" />
-          <DashboardCard title="Proposals Sent" value={stats.proposalsSent} icon={FileText} color="blue" />
-          <DashboardCard title="Total Earnings" value={stats.earnings} icon={DollarSign} color="green" isCurrency={true} />
-          <DashboardCard title="Completed" value={stats.completedProjects} icon={TrendingUp} color="orange" />
-        </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+          </div>
+        )}
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold">Recent Proposals</h2>
-              <Link to="/projects" className="text-purple-600 hover:underline">
-                Browse Projects
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-4 sm:mb-5">
+          <DashboardCard 
+            title="Active Jobs" 
+            value={stats.activeJobs} 
+            icon={Briefcase} 
+            color="purple" 
+          />
+          <DashboardCard 
+            title="Proposals" 
+            value={stats.proposalsSent} 
+            icon={FileText} 
+            color="blue" 
+          />
+          <DashboardCard 
+            title="Earnings" 
+            value={stats.earnings} 
+            icon={DollarSign} 
+            color="green" 
+            isCurrency 
+          />
+          <DashboardCard 
+            title="Completed" 
+            value={stats.completedProjects} 
+            icon={TrendingUp} 
+            color="orange" 
+          />
+
+          {/* Profile Progress Card */}
+          <div className="col-span-2 sm:col-span-2 lg:col-span-1 rounded-2xl p-3 sm:p-4 bg-gradient-to-br from-purple-500 to-indigo-500 text-white">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <p className="text-xl sm:text-2xl font-bold">{profileCompletion}%</p>
+                  <p className="text-xs sm:text-sm opacity-90 truncate">
+                    {profileCompletion >= 90
+                      ? "Perfect!"
+                      : profileCompletion >= 60
+                      ? "Almost There"
+                      : "Keep Going"}
+                  </p>
+                </div>
+                <div className="mt-2 h-1.5 sm:h-2 w-full bg-white/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, profileCompletion))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <Link
+                to="/profile"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-white text-purple-700 font-medium rounded-lg hover:bg-purple-50 text-xs sm:text-sm"
+              >
+                <Edit2 size={14} className="sm:w-4 sm:h-4" /> Complete
               </Link>
             </div>
-            {proposals.length > 0 ? (
-              <div className="space-y-4">
+          </div>
+        </div>
+
+        {/* Two Column Content */}
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-5 mb-6">
+          {/* Proposals */}
+          <div className="bg-white rounded-xl shadow p-4 sm:p-5 hover:shadow-lg transition">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Recent Proposals</h2>
+              <Link to="/projects" className="text-xs text-purple-600 hover:underline font-medium whitespace-nowrap">
+                Browse →
+              </Link>
+            </div>
+            {Array.isArray(proposals) && proposals.length > 0 ? (
+              <div className="space-y-3">
                 {proposals.slice(0, 5).map((proposal) => (
-                  <div key={proposal.id} className="border-b border-gray-200 pb-4">
-                    <h3 className="font-semibold text-gray-900">{proposal.project_title}</h3>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-600">Bid: INR {proposal.bid_amount}</span>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          proposal.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : proposal.status === 'accepted'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
+                  <Link
+                    key={proposal.id}
+                    to={`/projects/${proposal.project_id || proposal.project}`}
+                    className="block border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:shadow-md transition cursor-pointer"
+                  >
+                    <h3 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1 line-clamp-1">
+                      {proposal.project_title || 'Untitled Project'}
+                    </h3>
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                      <span className="text-xs sm:text-sm text-gray-600 font-medium">
+                        ₹{Number(proposal.bid_amount || 0).toLocaleString()}
+                      </span>
+                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${
+                        proposal.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        proposal.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
                         {proposal.status}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-600">No proposals yet. Start browsing projects!</p>
+              <div className="text-center py-8 sm:py-12">
+                <FileText className="mx-auto text-gray-300 mb-2" size={36} />
+                <p className="text-gray-600 mb-3 text-sm">No proposals yet</p>
+                <Link 
+                  to="/projects" 
+                  className="inline-block px-4 sm:px-5 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-sm shadow-md"
+                >
+                  Browse Projects
+                </Link>
+              </div>
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold">Active Contracts</h2>
-              <Link to="/contracts" className="text-purple-600 hover:underline">
-                View All
+          {/* Contracts */}
+          <div className="bg-white rounded-xl shadow p-4 sm:p-5 hover:shadow-lg transition">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Active Contracts</h2>
+              <Link to="/contracts" className="text-xs text-purple-600 hover:underline font-medium whitespace-nowrap">
+                View All →
               </Link>
             </div>
-            {contracts.length > 0 ? (
-              <div className="space-y-4">
+            {Array.isArray(contracts) && contracts.filter(c => c.status === 'active').length > 0 ? (
+              <div className="space-y-3">
                 {contracts.filter((c) => c.status === 'active').slice(0, 5).map((contract) => (
-                  <div key={contract.id} className="border-b border-gray-200 pb-4">
-                    <h3 className="font-semibold text-gray-900">{contract.project_title}</h3>
-                    <p className="text-sm text-gray-600 mt-1">Client: {contract.client_name}</p>
-                    <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  <Link
+                    key={contract.id}
+                    to={`/contracts/${contract.id}`}
+                    className="block border border-gray-200 rounded-lg p-3 hover:border-purple-300 hover:shadow-md transition cursor-pointer"
+                  >
+                    <h3 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1 line-clamp-1">
+                      {contract.project_title || 'Untitled Project'}
+                    </h3>
+                    <p className="text-xs text-gray-600 mb-2 line-clamp-1">
+                      Client: {contract.client_name || 'Unknown'}
+                    </p>
+                    <span className="inline-block px-2 sm:px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
                       {contract.status}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-600">No active contracts yet.</p>
+              <div className="text-center py-8 sm:py-12">
+                <Briefcase className="mx-auto text-gray-300 mb-2" size={36} />
+                <p className="text-gray-600 text-sm">No active contracts</p>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Tips */}
+        {profileCompletion < 100 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4 sm:p-6 shadow">
+            <h3 className="font-bold text-blue-900 mb-3 text-sm sm:text-base flex items-center gap-2">
+              💡 Boost Your Success
+            </h3>
+            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition">
+                <p className="font-semibold mb-1 text-xs sm:text-sm text-blue-900">Complete Profile</p>
+                <p className="text-[10px] sm:text-xs text-blue-700">Get 40% more views</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition">
+                <p className="font-semibold mb-1 text-xs sm:text-sm text-blue-900">Add Portfolio</p>
+                <p className="text-[10px] sm:text-xs text-blue-700">Showcase your work</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition">
+                <p className="font-semibold mb-1 text-xs sm:text-sm text-blue-900">Link Socials</p>
+                <p className="text-[10px] sm:text-xs text-blue-700">Build trust</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm hover:shadow-md transition">
+                <p className="font-semibold mb-1 text-xs sm:text-sm text-blue-900">Missing Items</p>
+                <p className="text-[10px] sm:text-xs text-blue-700">{missingItems.length} items left</p>
+              </div>
+            </div>
+            {missingItems.length > 0 && (
+              <div className="mt-4 bg-white bg-opacity-70 rounded-lg p-3 sm:p-4">
+                <p className="font-semibold mb-2 flex items-center gap-2 text-xs sm:text-sm text-blue-900">
+                  <AlertCircle size={16} /> Complete these to boost your profile:
+                </p>
+                <ul className="grid sm:grid-cols-2 gap-2 text-[11px] sm:text-xs text-blue-800">
+                  {missingItems.slice(0, 6).map((item, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-purple-600 flex-shrink-0">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                  {missingItems.length > 6 && (
+                    <li className="text-purple-700 font-medium">
+                      +{missingItems.length - 6} more items
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

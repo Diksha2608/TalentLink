@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     'proposals.apps.ProposalsConfig',
     'contracts.apps.ContractsConfig',
     'messaging.apps.MessagingConfig',
+    'notifications.apps.NotificationsConfig',
+    'jobs.apps.JobsConfig',
 ]
 
 # ================= MIDDLEWARE =================

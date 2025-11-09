@@ -1,9 +1,6 @@
-
 # backend/contracts/views.py
 from django.shortcuts import render
 from django.db import models 
-from rest_framework import viewsets, status
-
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -17,9 +14,17 @@ class ContractViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Contract.objects.filter(
+        queryset = Contract.objects.filter(
             models.Q(proposal__project__client=user) | models.Q(proposal__freelancer=user)
-        )
+        ).select_related(
+            'proposal__project__client',
+            'proposal__freelancer'
+        ).order_by('-created_at')  
+        
+
+        print(f"[Contracts] User: {user.email}, Role: {user.role}, Count: {queryset.count()}")
+        
+        return queryset
 
     @action(detail=True, methods=['post'])
     def sign(self, request, pk=None):
@@ -39,9 +44,34 @@ class ContractViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
         contract = self.get_object()
+        
+        # Only client can mark as completed
+        if contract.proposal.project.client != request.user:
+            return Response(
+                {'detail': 'Only the client can mark the contract as completed.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         contract.status = 'completed'
         contract.save()
-        return Response({'detail': 'Contract marked as completed.'}, status=status.HTTP_200_OK)
+        
+        # update the project status
+        project = contract.proposal.project
+        project.status = 'completed'
+        project.save()
+        
+        #Update freelancer's completed projects count
+        freelancer_profile = contract.proposal.freelancer.freelancer_profile
+        if freelancer_profile:
+            freelancer_profile.projects_completed = (
+                freelancer_profile.projects_completed or 0
+            ) + 1
+            freelancer_profile.save()
+        
+        return Response(
+            {'detail': 'Contract marked as completed. Project status updated.'},
+            status=status.HTTP_200_OK
+        )
 
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
