@@ -21,7 +21,6 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
 
   const handleStartChat = (e) => {
     e.stopPropagation();
-    // keep logic; just ensure query param the Messages page reads
     navigate(`/messages?user=${profile.id}`);
   };
 
@@ -141,7 +140,6 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
               </button>
             </div>
 
-            {/* smaller text so more content fits */}
             <div className="p-6 text-sm">
               {/* Profile Header */}
               <div className="flex items-start gap-6 mb-6 pb-6 border-b border-gray-200">
@@ -251,7 +249,7 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
                 </div>
               )}
 
-              {/* Languages — robust render for string or object with name/language */}
+              {/* Languages*/}
               {Array.isArray(freelancer.languages) && freelancer.languages.length > 0 && (
                 <div className="mb-6">
                   <h4 className="font-semibold text-gray-900 mb-3">Languages</h4>

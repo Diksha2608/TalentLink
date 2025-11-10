@@ -34,7 +34,6 @@ export default function ProjectDetail({ user }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // ⬇️ Modal to show your real FreelancerCard
   const [freelancerModalOpen, setFreelancerModalOpen] = useState(false);
   const [freelancerForModal, setFreelancerForModal] = useState(null);
 
@@ -42,7 +41,7 @@ export default function ProjectDetail({ user }) {
     loadProject();
     if (user?.role === 'client') loadProposals();
     else if (user?.role === 'freelancer') checkUserProposal();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   }, [id, user]);
 
   const loadProject = async () => {
@@ -77,7 +76,7 @@ export default function ProjectDetail({ user }) {
     }
   };
 
-  // ✅ Simpler & reliable: let Messages.jsx handle existing/new via ?user=
+
   const handleChat = (freelancerId) => {
     if (!user) {
       navigate('/signin');
@@ -198,7 +197,7 @@ export default function ProjectDetail({ user }) {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
-        {/* ===== Project details (unchanged UI) ===== */}
+        {/* ===== Project details ===== */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div className="flex-1">
@@ -398,7 +397,7 @@ export default function ProjectDetail({ user }) {
                           </div>
                         </div>
 
-                        {/* Only ONE View Details button (top-right) */}
+                        {/*  View Details button  */}
                         <button
                           onClick={() => { setFreelancerForModal(f); setFreelancerModalOpen(true); }}
                           className="px-3 py-1 border border-gray-300 rounded text-xs font-medium hover:bg-purple-50 hover:border-purple-300"
@@ -424,7 +423,7 @@ export default function ProjectDetail({ user }) {
                         <p className="text-sm text-gray-700 leading-relaxed">{p.cover_letter}</p>
                       </div>
 
-                      {/* Actions – removed "View Full Details" */}
+                      {/* Actions */}
                       <div className="flex flex-wrap gap-2 pt-3 border-t mt-2">
                         <button
                           onClick={() => handleChat(f.id || p.freelancer_id)}
@@ -464,7 +463,7 @@ export default function ProjectDetail({ user }) {
           </div>
         )}
 
-        {/* ===== Submit proposal modal (unchanged) ===== */}
+        {/* ===== Submit proposal modal  ===== */}
         {showProposalModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-2xl w-full p-8 relative max-h-screen overflow-y-auto">

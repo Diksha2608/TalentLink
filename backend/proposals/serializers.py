@@ -7,7 +7,6 @@ class ProposalSerializer(serializers.ModelSerializer):
     project_id = serializers.IntegerField(source='project.id', read_only=True)
     freelancer_id = serializers.IntegerField(source='freelancer.id', read_only=True)
     
-    # Add full freelancer profile data
     freelancer = serializers.SerializerMethodField()
     
     class Meta:
@@ -34,7 +33,7 @@ class ProposalSerializer(serializers.ModelSerializer):
             profile_data = FreelancerProfileSerializer(profile, context=self.context).data
             
             # Merge user data into profile data structure
-            # This matches what FreelancerCard expects
+          
             result = {
                 'id': freelancer_user.id,
                 'first_name': freelancer_user.first_name,

@@ -51,7 +51,6 @@ export default function Talent() {
     }
     
     if (risingTalent) {
-      // backend should return “new/low projects completed” when this is true
       params.rising_talent = 'true';
     }
     
@@ -148,7 +147,6 @@ export default function Talent() {
             >
               Search
             </button>
-            {/* NEW: Clear next to Search to show all freelancers */}
             <button
               type="button"
               onClick={clearAllFilters}
