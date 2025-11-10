@@ -28,7 +28,6 @@ export default function Talent() {
       const timeoutId = setTimeout(() => {
         loadFreelancers();
       }, 500);
-
       return () => clearTimeout(timeoutId);
     } else {
       setFiltersInitialized(true);
@@ -52,6 +51,7 @@ export default function Talent() {
     }
     
     if (risingTalent) {
+      // backend should return “new/low projects completed” when this is true
       params.rising_talent = 'true';
     }
     
@@ -147,6 +147,14 @@ export default function Talent() {
               className="px-5 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition"
             >
               Search
+            </button>
+            {/* NEW: Clear next to Search to show all freelancers */}
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="px-5 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition"
+            >
+              Clear
             </button>
           </form>
         </div>

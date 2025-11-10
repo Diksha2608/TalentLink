@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, Calendar, X, CheckCircle, MessageCircle, Trash2, User, MapPin, Star, Briefcase, Award, FileText, LogIn } from 'lucide-react';
+import {
+  DollarSign, Clock, Calendar, X, CheckCircle, MessageCircle, Trash2,
+  MapPin, Star, Briefcase, Award, FileText, LogIn
+} from 'lucide-react';
 import { projectsAPI } from '../api/projects';
 import { proposalsAPI } from '../api/proposals';
 import { formatCurrency } from '../utils/currency';
-import { messagesAPI } from '../api/messages';
+// ⬇️ NEW: bring in your existing card
+import FreelancerCard from '../components/FreelancerCard';
 
 const DURATION_MAP = {
   less_1_month: 'Less than 1 month',
@@ -12,23 +16,12 @@ const DURATION_MAP = {
   '3_6_months': '3-6 months',
   '6_plus_months': '6+ months',
 };
-
 const HOURS_MAP = {
   less_30: 'Less than 30 hrs/week',
   more_30: 'More than 30 hrs/week',
 };
-
-const EXPERIENCE_MAP = {
-  entry: 'Entry Level',
-  intermediate: 'Intermediate',
-  expert: 'Expert',
-};
-
-const LOCATION_MAP = {
-  remote: 'Remote',
-  hybrid: 'Hybrid',
-  onsite: 'Onsite',
-};
+const EXPERIENCE_MAP = { entry: 'Entry Level', intermediate: 'Intermediate', expert: 'Expert' };
+const LOCATION_MAP = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'Onsite' };
 
 export default function ProjectDetail({ user }) {
   const { id } = useParams();
@@ -37,21 +30,19 @@ export default function ProjectDetail({ user }) {
   const [proposals, setProposals] = useState([]);
   const [userProposal, setUserProposal] = useState(null);
   const [showProposalModal, setShowProposalModal] = useState(false);
-  const [proposalForm, setProposalForm] = useState({
-    cover_letter: '',
-    bid_amount: '',
-    estimated_time: '',
-  });
+  const [proposalForm, setProposalForm] = useState({ cover_letter: '', bid_amount: '', estimated_time: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // ⬇️ Modal to show your real FreelancerCard
+  const [freelancerModalOpen, setFreelancerModalOpen] = useState(false);
+  const [freelancerForModal, setFreelancerForModal] = useState(null);
+
   useEffect(() => {
     loadProject();
-    if (user?.role === 'client') {
-      loadProposals();
-    } else if (user?.role === 'freelancer') {
-      checkUserProposal();
-    }
+    if (user?.role === 'client') loadProposals();
+    else if (user?.role === 'freelancer') checkUserProposal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, user]);
 
   const loadProject = async () => {
@@ -86,31 +77,21 @@ export default function ProjectDetail({ user }) {
     }
   };
 
-  const handleChat = async (freelancerId) => {
+  // ✅ Simpler & reliable: let Messages.jsx handle existing/new via ?user=
+  const handleChat = (freelancerId) => {
     if (!user) {
       navigate('/signin');
       return;
     }
-    try {
-      const res = await messagesAPI.getOrCreateThreadWith(freelancerId);
-      const threadId = res.data?.id || res.data?.thread?.id;
-      if (threadId) {
-        navigate(`/messages/${threadId}`);
-      } else {
-        navigate(`/messages?user=${freelancerId}`);
-      }
-    } catch (err) {
-      console.error('Failed to start chat:', err);
-      navigate(`/messages?user=${freelancerId}`);
-    }
+    navigate(`/messages?user=${freelancerId}`);
   };
 
   const checkUserProposal = async () => {
     try {
       const response = await proposalsAPI.list();
       const list = response.data.results || response.data || [];
-      const userProposalForProject = list.find((p) => p.project === parseInt(id)) || null;
-      setUserProposal(userProposalForProject);
+      const up = list.find((p) => p.project === parseInt(id)) || null;
+      setUserProposal(up);
     } catch (err) {
       console.error('Failed to check proposal:', err);
     }
@@ -118,27 +99,18 @@ export default function ProjectDetail({ user }) {
 
   const handleSubmitProposal = async (e) => {
     e.preventDefault();
-    
-    // Check if user is logged in
     if (!user) {
       alert('Please sign in to submit a proposal');
       navigate('/signin');
       return;
     }
-
-    // Check if user is a freelancer
     if (user.role !== 'freelancer') {
       alert('Only freelancers can submit proposals');
       return;
     }
-
     setError('');
-
     try {
-      await proposalsAPI.create({
-        project: id,
-        ...proposalForm,
-      });
+      await proposalsAPI.create({ project: id, ...proposalForm });
       setShowProposalModal(false);
       setProposalForm({ cover_letter: '', bid_amount: '', estimated_time: '' });
       checkUserProposal();
@@ -154,7 +126,7 @@ export default function ProjectDetail({ user }) {
       loadProposals();
       loadProject();
       alert('Proposal accepted! Contract created.');
-    } catch (err) {
+    } catch {
       alert('Failed to accept proposal');
     }
   };
@@ -164,21 +136,22 @@ export default function ProjectDetail({ user }) {
       await proposalsAPI.reject(proposalId);
       loadProposals();
       alert('Proposal rejected');
-    } catch (err) {
+    } catch {
       alert('Failed to reject proposal');
     }
   };
 
   const handleProposalButtonClick = () => {
-    if (!user) {
-      navigate('/signin');
-      return;
-    }
-    if (user.role !== 'freelancer') {
-      alert('Only freelancers can submit proposals');
-      return;
-    }
+    if (!user) { navigate('/signin'); return; }
+    if (user.role !== 'freelancer') { alert('Only freelancers can submit proposals'); return; }
     setShowProposalModal(true);
+  };
+
+  const getFreelancerName = (f) => {
+    if (!f) return 'Freelancer';
+    if (f.name) return f.name;
+    if (f.first_name || f.last_name) return `${f.first_name || ''} ${f.last_name || ''}`.trim();
+    return 'Freelancer';
   };
 
   if (loading) {
@@ -225,7 +198,7 @@ export default function ProjectDetail({ user }) {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
-        {/* PROJECT DETAILS CARD */}
+        {/* ===== Project details (unchanged UI) ===== */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div className="flex-1">
@@ -266,28 +239,20 @@ export default function ProjectDetail({ user }) {
 
           <p className="text-gray-700 mb-6 text-lg leading-relaxed">{project.description}</p>
 
-          {/* Skills */}
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">Required Skills</h3>
             <div className="flex flex-wrap gap-2">
               {project.skills_required?.map((skill) => (
-                <span
-                  key={skill.id}
-                  className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full font-medium text-sm"
-                >
+                <span key={skill.id} className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full font-medium text-sm">
                   {skill.name}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Project Info Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-6 rounded-lg">
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <DollarSign size={18} />
-                <span className="text-sm font-medium">Budget</span>
-              </div>
+              <div className="flex items-center gap-2 text-gray-600 mb-1"><DollarSign size={18} /><span className="text-sm font-medium">Budget</span></div>
               <span className="text-lg font-bold text-gray-900">
                 {project.job_type === 'fixed' && project.fixed_payment
                   ? formatCurrency(project.fixed_payment)
@@ -295,78 +260,41 @@ export default function ProjectDetail({ user }) {
                   ? `${formatCurrency(project.hourly_min || 0)} - ${formatCurrency(project.hourly_max || 0)}/hr`
                   : `${formatCurrency(project.budget_min)} - ${formatCurrency(project.budget_max)}`}
               </span>
-              <span className="text-xs text-gray-500 mt-1">
-                {project.job_type === 'hourly' ? 'Hourly Rate' : 'Fixed Price'}
-              </span>
+              <span className="text-xs text-gray-500 mt-1">{project.job_type === 'hourly' ? 'Hourly Rate' : 'Fixed Price'}</span>
             </div>
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <Clock size={18} />
-                <span className="text-sm font-medium">Duration</span>
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                {DURATION_MAP[project.duration] || project.duration}
-              </span>
-              <span className="text-xs text-gray-500 mt-1">
-                {HOURS_MAP[project.hours_per_week] || project.hours_per_week}
-              </span>
+              <div className="flex items-center gap-2 text-gray-600 mb-1"><Clock size={18} /><span className="text-sm font-medium">Duration</span></div>
+              <span className="text-lg font-bold text-gray-900">{DURATION_MAP[project.duration] || project.duration}</span>
+              <span className="text-xs text-gray-500 mt-1">{HOURS_MAP[project.hours_per_week] || project.hours_per_week}</span>
             </div>
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <Award size={18} />
-                <span className="text-sm font-medium">Experience</span>
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                {EXPERIENCE_MAP[project.experience_level] || project.experience_level}
-              </span>
+              <div className="flex items-center gap-2 text-gray-600 mb-1"><Award size={18} /><span className="text-sm font-medium">Experience</span></div>
+              <span className="text-lg font-bold text-gray-900">{EXPERIENCE_MAP[project.experience_level] || project.experience_level}</span>
               <span className="text-xs text-gray-500 mt-1">Required Level</span>
             </div>
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <MapPin size={18} />
-                <span className="text-sm font-medium">Location</span>
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                {LOCATION_MAP[project.location_type] || project.location_type}
-              </span>
-              <span className="text-xs text-gray-500 mt-1">
-                {project.client_location || 'Any Location'}
-              </span>
+              <div className="flex items-center gap-2 text-gray-600 mb-1"><MapPin size={18} /><span className="text-sm font-medium">Location</span></div>
+              <span className="text-lg font-bold text-gray-900">{LOCATION_MAP[project.location_type] || project.location_type}</span>
+              <span className="text-xs text-gray-500 mt-1">{project.client_location || 'Any Location'}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-4 text-sm text-gray-600 border-t pt-4">
-            <div className="flex items-center gap-2">
-              <Calendar size={16} />
-              <span>Posted: {new Date(project.created_at).toLocaleDateString()}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <FileText size={16} />
-              <span>{project.proposal_count || 0} Proposals</span>
-            </div>
+            <div className="flex items-center gap-2"><Calendar size={16} /><span>Posted: {new Date(project.created_at).toLocaleDateString()}</span></div>
+            <div className="flex items-center gap-2"><FileText size={16} /><span>{project.proposal_count || 0} Proposals</span></div>
           </div>
 
-          {/* Attachments */}
           {Array.isArray(project.file_attachments) && project.file_attachments.length > 0 && (
             <div className="mt-6 border-t pt-6">
               <h3 className="text-lg font-semibold mb-3">Attachments</h3>
               <ul className="space-y-2">
                 {project.file_attachments.map((att) => (
-                  <li
-                    key={att.id}
-                    className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-gray-50"
-                  >
+                  <li key={att.id} className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-gray-50">
                     <span className="text-sm font-medium truncate">{att.original_name || 'Attachment'}</span>
-                    <a
-                      href={att.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-                      download
-                    >
+                    <a href={att.file_url} target="_blank" rel="noreferrer" className="text-sm px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" download>
                       Download
                     </a>
                   </li>
@@ -375,43 +303,24 @@ export default function ProjectDetail({ user }) {
             </div>
           )}
 
-          {/* Actions for Non-Logged-In Users or Non-Freelancers */}
           {!user && project.status === 'open' && (
             <div className="mt-6 border-t pt-6">
               <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 text-center">
-                <LogIn className="mx-auto mb-3 text-blue-600" size={48} />
-                <h3 className="text-lg font-bold text-blue-900 mb-2">
-                  Interested in this project?
-                </h3>
-                <p className="text-blue-700 mb-4">
-                  Sign in as a freelancer to submit your proposal
-                </p>
+                <Calendar className="mx-auto mb-3 text-blue-600" size={48} />
+                <h3 className="text-lg font-bold text-blue-900 mb-2">Interested in this project?</h3>
+                <p className="text-blue-700 mb-4">Sign in as a freelancer to submit your proposal</p>
                 <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={() => navigate('/signin')}
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    onClick={() => navigate('/signup')}
-                    className="px-6 py-3 bg-white border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold"
-                  >
-                    Sign Up
-                  </button>
+                  <button onClick={() => navigate('/signin')} className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">Sign In</button>
+                  <button onClick={() => navigate('/signup')} className="px-6 py-3 bg-white border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold">Sign Up</button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Freelancer Actions */}
           {user?.role === 'freelancer' && (
             <div className="mt-6 border-t pt-6">
               {canSubmitProposal ? (
-                <button
-                  onClick={handleProposalButtonClick}
-                  className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg"
-                >
+                <button onClick={handleProposalButtonClick} className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg">
                   Submit Proposal
                 </button>
               ) : userProposal ? (
@@ -423,23 +332,15 @@ export default function ProjectDetail({ user }) {
                   <p className="text-blue-700 mb-3 text-base">
                     Status: <span className="font-semibold capitalize">{userProposal.status}</span>
                   </p>
-                  <button
-                    onClick={() => navigate('/projects')}
-                    className="text-blue-600 hover:underline font-medium"
-                  >
+                  <button onClick={() => navigate('/projects')} className="text-blue-600 hover:underline font-medium">
                     Browse Other Projects →
                   </button>
                 </div>
               ) : (
                 project.status !== 'open' && (
                   <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6">
-                    <p className="text-yellow-800 font-semibold text-base mb-2">
-                      This project is no longer accepting proposals
-                    </p>
-                    <button
-                      onClick={() => navigate('/projects')}
-                      className="text-yellow-600 hover:underline font-medium"
-                    >
+                    <p className="text-yellow-800 font-semibold text-base mb-2">This project is no longer accepting proposals</p>
+                    <button onClick={() => navigate('/projects')} className="text-yellow-600 hover:underline font-medium">
                       Browse Other Projects →
                     </button>
                   </div>
@@ -448,7 +349,6 @@ export default function ProjectDetail({ user }) {
             </div>
           )}
 
-          {/* Client Role - Show message */}
           {user?.role === 'client' && user.id !== project.client && (
             <div className="mt-6 border-t pt-6">
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
@@ -458,165 +358,123 @@ export default function ProjectDetail({ user }) {
           )}
         </div>
 
-        {/* PROPOSALS FOR CLIENT */}
+        {/* ===== Proposals (client) ===== */}
         {user?.role === 'client' && user.id === project.client && (
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Proposals Received ({proposals.length})</h2>
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Proposals Received ({proposals.length})</h2>
             </div>
 
             {proposals.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-600 text-lg">No proposals yet.</p>
+              <div className="text-center py-10">
+                <FileText size={40} className="mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-600">No proposals yet.</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                {proposals.map((p) => (
-                  <div key={p.id} className="border-2 border-gray-200 rounded-xl p-6 hover:border-purple-300 hover:shadow-lg transition-all">
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        {p.freelancer?.avatar ? (
-                          <img
-                            src={p.freelancer.avatar}
-                            alt=""
-                            className="w-16 h-16 rounded-full object-cover border-2 border-purple-200"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xl">
-                            {(p.freelancer?.name || p.freelancer_name || 'F')[0]}
+              <div className="space-y-4">
+                {proposals.map((p) => {
+                  const f = p.freelancer || {};
+                  const name = getFreelancerName(f);
+                  const rating = f.rating_avg?.toFixed?.(1) ?? '0.0';
+                  const location = f.location || 'Not specified';
+                  const projectsDone = f.projects_completed || 0;
+
+                  return (
+                    <div key={p.id} className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:shadow-sm transition-all">
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="leading-tight">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900 text-sm">{name}</h3>
+                            {f.is_top_rated && <Award size={12} className="text-yellow-500" title="Top Rated" />}
                           </div>
-                        )}
+                          <div className="flex items-center gap-3 text-[12px] text-gray-600 mt-0.5">
+                            <span className="inline-flex items-center gap-1">
+                              <Star size={11} className="text-yellow-400 fill-yellow-400" />
+                              <span className="font-medium">{rating}</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1"><MapPin size={11} />{location}</span>
+                            <span className="inline-flex items-center gap-1"><Briefcase size={11} />{projectsDone} projects</span>
+                          </div>
+                        </div>
+
+                        {/* Only ONE View Details button (top-right) */}
+                        <button
+                          onClick={() => { setFreelancerForModal(f); setFreelancerModalOpen(true); }}
+                          className="px-3 py-1 border border-gray-300 rounded text-xs font-medium hover:bg-purple-50 hover:border-purple-300"
+                        >
+                          View Details
+                        </button>
+                      </div>
+
+                      {/* Proposal brief */}
+                      <div className="grid grid-cols-2 gap-3 mb-2 bg-purple-50 p-2 rounded">
                         <div>
-                          <h3 className="font-bold text-xl text-gray-900">
-                            {p.freelancer?.name || p.freelancer_name}
-                          </h3>
-                          <p className="text-gray-600">{p.freelancer?.title || 'Freelancer'}</p>
+                          <div className="text-[12px] text-gray-600 mb-0.5 font-medium">Bid Amount</div>
+                          <div className="text-sm font-bold text-purple-700">{formatCurrency(p.bid_amount)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[12px] text-gray-600 mb-0.5 font-medium">Estimated Time</div>
+                          <div className="text-sm font-bold text-purple-700">{p.estimated_time}</div>
                         </div>
                       </div>
-                      <span
-                        className={`px-4 py-2 rounded-full text-sm font-bold ${
-                          p.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : p.status === 'accepted'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}
-                      >
-                        {p.status.toUpperCase()}
-                      </span>
-                    </div>
 
-                    {/* Freelancer Info Grid */}
-                    {p.freelancer && (
-                      <div className="grid grid-cols-3 gap-4 mb-4 bg-gray-50 p-4 rounded-lg">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                            <MapPin size={16} />
-                            <span className="text-xs font-medium">Location</span>
-                          </div>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {p.freelancer.location || 'Not specified'}
-                          </span>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                            <Star size={16} className="text-yellow-400 fill-yellow-400" />
-                            <span className="text-xs font-medium">Rating</span>
-                          </div>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {p.freelancer.rating_avg?.toFixed?.(1) ?? '0.0'} / 5.0
-                          </span>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-gray-600 mb-1">
-                            <Briefcase size={16} />
-                            <span className="text-xs font-medium">Projects</span>
-                          </div>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {p.freelancer.projects_completed || 0}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Proposal Details Grid */}
-                    <div className="grid grid-cols-2 gap-6 mb-4 bg-purple-50 p-4 rounded-lg">
                       <div>
-                        <div className="text-sm text-gray-600 mb-1 font-medium">Bid Amount</div>
-                        <div className="text-2xl font-bold text-purple-700">
-                          {formatCurrency(p.bid_amount)}
-                        </div>
+                        <h4 className="text-[12px] font-semibold text-gray-700 mb-0.5">Cover Letter</h4>
+                        <p className="text-sm text-gray-700 leading-relaxed">{p.cover_letter}</p>
                       </div>
-                      <div>
-                        <div className="text-sm text-gray-600 mb-1 font-medium">Estimated Time</div>
-                        <div className="text-2xl font-bold text-purple-700">{p.estimated_time}</div>
+
+                      {/* Actions – removed "View Full Details" */}
+                      <div className="flex flex-wrap gap-2 pt-3 border-t mt-2">
+                        <button
+                          onClick={() => handleChat(f.id || p.freelancer_id)}
+                          className="px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 inline-flex items-center gap-1.5 text-xs font-medium"
+                        >
+                          <MessageCircle size={14} /> Chat
+                        </button>
+
+                        {p.status === 'pending' ? (
+                          <>
+                            <button
+                              onClick={() => handleAcceptProposal(p.id)}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-xs font-medium"
+                            >
+                              ✓ Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectProposal(p.id)}
+                              className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 text-xs font-medium"
+                            >
+                              ✗ Reject
+                            </button>
+                          </>
+                        ) : (
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            p.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {p.status.toUpperCase()}
+                          </span>
+                        )}
                       </div>
                     </div>
-
-                    {/* Cover Letter */}
-                    <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Cover Letter</h4>
-                      <p className="text-gray-700 leading-relaxed">{p.cover_letter}</p>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3 pt-4 border-t">
-                      <button
-                        onClick={() => navigate(`/proposals/${p.id}`)}
-                        className="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-purple-400 hover:bg-purple-50 font-medium transition-all"
-                      >
-                        View Full Details
-                      </button>
-                      <button
-                        onClick={() => handleChat(p.freelancer?.id || p.freelancer_id)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 font-medium transition-all"
-                      >
-                        <MessageCircle size={18} /> Start Chat
-                      </button>
-                      {p.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => handleAcceptProposal(p.id)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-all"
-                          >
-                            ✓ Accept Proposal
-                          </button>
-                          <button
-                            onClick={() => handleRejectProposal(p.id)}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-all"
-                          >
-                            ✗ Reject
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* Proposal Modal */}
+        {/* ===== Submit proposal modal (unchanged) ===== */}
         {showProposalModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg max-w-2xl w-full p-8 relative max-h-screen overflow-y-auto">
-              <button
-                onClick={() => setShowProposalModal(false)}
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => setShowProposalModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
 
               <h2 className="text-2xl font-bold mb-6">Submit Your Proposal</h2>
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4">
-                  {error}
-                </div>
-              )}
+              {error && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4">{error}</div>}
 
               <form onSubmit={handleSubmitProposal} className="space-y-4">
                 <div>
@@ -634,10 +492,7 @@ export default function ProjectDetail({ user }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Your Bid Amount (₹)</label>
                   <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
+                    type="number" required min="0" step="0.01"
                     value={proposalForm.bid_amount}
                     onChange={(e) => setProposalForm({ ...proposalForm, bid_amount: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
@@ -648,8 +503,7 @@ export default function ProjectDetail({ user }) {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Completion Time</label>
                   <input
-                    type="text"
-                    required
+                    type="text" required
                     value={proposalForm.estimated_time}
                     onChange={(e) => setProposalForm({ ...proposalForm, estimated_time: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
@@ -658,21 +512,51 @@ export default function ProjectDetail({ user }) {
                 </div>
 
                 <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowProposalModal(false)}
-                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  >
+                  <button type="button" onClick={() => setShowProposalModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                     Cancel
                   </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
+                  <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                     Submit Proposal
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ===== Your FreelancerCard inside a modal - THIS OPENS THE FULL CARD ===== */}
+        {freelancerModalOpen && freelancerForModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setFreelancerModalOpen(false)}>
+            <div className="max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
+              <FreelancerCard 
+                freelancer={{
+                  // Merge user data with profile
+                  id: freelancerForModal.id,
+                  hourly_rate: freelancerForModal.hourly_rate || 0,
+                  availability: freelancerForModal.availability,
+                  skills: freelancerForModal.skills || [],
+                  portfolio: freelancerForModal.portfolio || '',
+                  portfolio_files: freelancerForModal.portfolio_files || [],
+                  role_title: freelancerForModal.role_title || '',
+                  social_links: freelancerForModal.social_links || {},
+                  languages: freelancerForModal.languages || [],
+                  experiences: freelancerForModal.experiences || [],
+                  education: freelancerForModal.education || [],
+                  projects_completed: freelancerForModal.projects_completed || 0,
+                  total_earnings: freelancerForModal.total_earnings || 0,
+                  user: {
+                    id: freelancerForModal.id,
+                    first_name: freelancerForModal.first_name || '',
+                    last_name: freelancerForModal.last_name || '',
+                    email: freelancerForModal.email || '',
+                    avatar: freelancerForModal.avatar,
+                    bio: freelancerForModal.bio || '',
+                    location: freelancerForModal.location || '',
+                    rating_avg: freelancerForModal.rating_avg || 0,
+                  }
+                }} 
+                showChatButton={true}
+              />
             </div>
           </div>
         )}

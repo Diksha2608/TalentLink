@@ -33,17 +33,20 @@ export default function Messages({ user }) {
 
   // Handle URL parameter to auto-select conversation
   useEffect(() => {
-    const userId = searchParams.get('user');
-    
+    // accept both ?user= and ?userId= for compatibility
+    const userId = searchParams.get('user') || searchParams.get('userId');
+
     if (userId && conversations.length > 0) {
       const foundConv = conversations.find(c => String(c.id) === String(userId));
-      
       if (foundConv) {
         setSelectedUser(foundConv);
       } else {
-        // User not in conversations, fetch their details
+        // User not in conversations, fetch their details (start new chat)
         fetchAndStartConversation(userId);
       }
+    } else if (userId && conversations.length === 0) {
+      // conversations may load a bit later; ensure we still fetch user so UI opens
+      fetchAndStartConversation(userId);
     }
   }, [searchParams, conversations]);
 
@@ -51,7 +54,6 @@ export default function Messages({ user }) {
     try {
       const response = await client.get(`/users/${userId}/`);
       const userData = response.data;
-      
       const newUser = {
         id: userData.id,
         first_name: userData.first_name,
@@ -59,7 +61,6 @@ export default function Messages({ user }) {
         email: userData.email,
         role: userData.role,
       };
-      
       setSelectedUser(newUser);
     } catch (err) {
       console.error('Failed to fetch user:', err);
@@ -369,7 +370,7 @@ export default function Messages({ user }) {
                                   : 'bg-gray-100 hover:bg-gray-200'
                               }`}
                             >
-                              <span className="text-lg">{getFileIcon(msg.file_url)}</span>
+                              <span className="text-lg">📎</span>
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs font-medium truncate">
                                   Attachment

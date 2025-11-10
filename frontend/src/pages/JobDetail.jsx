@@ -28,11 +28,14 @@ export default function JobDetail({ user }) {
   const [userApplication, setUserApplication] = useState(null);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [checkingApplication, setCheckingApplication] = useState(true);
 
   useEffect(() => {
     loadJob();
     if (user?.role === 'freelancer') {
       checkUserApplication();
+    } else {
+      setCheckingApplication(false);
     }
   }, [id, user]);
 
@@ -52,20 +55,23 @@ export default function JobDetail({ user }) {
   // Check if THIS user has already applied to THIS job
   const checkUserApplication = async () => {
     try {
+      setCheckingApplication(true);
       const response = await jobApplicationsAPI.list();
       const list = response.data.results || response.data || [];
-      // common backends use fields like applicant, freelancer, or user — check safely
       const parsedId = parseInt(id, 10);
       const myApp = list.find(
         (app) =>
-          app.job === parsedId &&
+          (app.job === parsedId || app.job_id === parsedId) &&
           (app.applicant === user?.id ||
             app.freelancer === user?.id ||
+            app.freelancer_id === user?.id ||
             app.user === user?.id)
       ) || null;
       setUserApplication(myApp);
     } catch (err) {
       console.error('Failed to check application:', err);
+    } finally {
+      setCheckingApplication(false);
     }
   };
 
@@ -105,7 +111,7 @@ export default function JobDetail({ user }) {
     setShowApplicationModal(true);
   };
 
-  if (loading) {
+  if (loading || checkingApplication) {
     return (
       <div className="container mx-auto px-4 py-8 text-center">
         <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
@@ -315,6 +321,9 @@ export default function JobDetail({ user }) {
                   <p className="text-blue-700 mb-3 text-base">
                     Status: <span className="font-semibold capitalize">{userApplication.status}</span>
                   </p>
+                  <p className="text-blue-600 text-sm mb-3">
+                    Your application has been sent to the client. You'll be notified when they respond.
+                  </p>
                   <button
                     onClick={() => navigate('/jobs')}
                     className="text-blue-600 hover:underline font-medium"
@@ -323,6 +332,23 @@ export default function JobDetail({ user }) {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Freelancer viewing closed job */}
+          {user?.role === 'freelancer' && job.status !== 'open' && (
+            <div className="mt-6 border-t pt-6">
+              <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 text-center">
+                <p className="text-yellow-800 font-semibold text-base mb-2">
+                  This job is no longer accepting applications
+                </p>
+                <button
+                  onClick={() => navigate('/jobs')}
+                  className="text-yellow-600 hover:underline font-medium"
+                >
+                  Browse Other Jobs →
+                </button>
+              </div>
             </div>
           )}
 
@@ -336,7 +362,6 @@ export default function JobDetail({ user }) {
           )}
         </div>
       </div>
-
 
       {showApplicationModal && (
         <JobApplicationForm

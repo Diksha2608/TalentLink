@@ -23,7 +23,14 @@ class ProposalViewSet(viewsets.ModelViewSet):
         
         print(f"[Proposals] User: {user.email}, Role: {user.role}, Count: {queryset.count()}")
         
-        return queryset.select_related('project', 'freelancer').order_by('-created_at')
+        return queryset.select_related(
+            'project', 
+            'freelancer', 
+            'freelancer__freelancer_profile'
+        ).prefetch_related(
+            'freelancer__freelancer_profile__skills',
+            'freelancer__freelancer_profile__portfolio_files'
+        ).order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
         project_id = request.data.get('project')

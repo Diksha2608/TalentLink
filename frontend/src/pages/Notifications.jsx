@@ -76,19 +76,21 @@ export default function Notifications() {
       }
       return;
     } else if (notif.type === 'proposal') {
+      // For proposal notifications, navigate to the proposal detail page
       if (meta.proposal_id) {
         navigate(`/proposals/${meta.proposal_id}`);
       } else if (meta.project_id) {
+        // If no proposal_id but has project_id, go to project detail
         navigate(`/projects/${meta.project_id}`);
       } else {
+        // Fallback to proposals list
         navigate('/proposals');
       }
     } else if (notif.type === 'job_application') {
       // Handle job application notifications
       if (meta.application_id) {
-        // For now, navigate to the job detail page
-        // Later you can create a dedicated application detail page
-        navigate(`/jobs/${meta.job_id}`);
+        // Navigate to job detail page with application context
+        navigate(`/jobs/${meta.job_id}`, { state: { applicationId: meta.application_id } });
       } else if (meta.job_id) {
         navigate(`/jobs/${meta.job_id}`);
       } else {

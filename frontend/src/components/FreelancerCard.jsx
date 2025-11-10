@@ -21,7 +21,8 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
 
   const handleStartChat = (e) => {
     e.stopPropagation();
-    navigate(`/messages?userId=${profile.id}`);
+    // keep logic; just ensure query param the Messages page reads
+    navigate(`/messages?user=${profile.id}`);
   };
 
   return (
@@ -140,7 +141,8 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
               </button>
             </div>
 
-            <div className="p-6">
+            {/* smaller text so more content fits */}
+            <div className="p-6 text-sm">
               {/* Profile Header */}
               <div className="flex items-start gap-6 mb-6 pb-6 border-b border-gray-200">
                 {profile.avatar ? (
@@ -168,7 +170,7 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
                   {freelancer.role_title && (
                     <p className="text-lg text-gray-600 mb-3">{freelancer.role_title}</p>
                   )}
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                  <div className="flex items-center gap-4 text-gray-600 mb-3">
                     {profile.location && (
                       <div className="flex items-center gap-1">
                         <MapPin size={16} />
@@ -193,7 +195,7 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
               {/* Bio */}
               {profile.bio && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-3">About</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">About</h4>
                   <p className="text-gray-700 leading-relaxed">{profile.bio}</p>
                 </div>
               )}
@@ -201,12 +203,12 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
               {/* Skills */}
               {freelancer.skills && freelancer.skills.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-3">Skills</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">Skills</h4>
                   <div className="flex flex-wrap gap-2">
                     {freelancer.skills.map((skill) => (
                       <span
                         key={skill.id}
-                        className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
+                        className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium"
                       >
                         {skill.name}
                       </span>
@@ -215,22 +217,53 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
                 </div>
               )}
 
-              {/* Portfolio */}
+              {/* Portfolio text/links */}
               {freelancer.portfolio && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-3">Portfolio</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">Portfolio</h4>
                   <p className="text-gray-700">{freelancer.portfolio}</p>
                 </div>
               )}
 
-              {/* Languages */}
-              {freelancer.languages && freelancer.languages.length > 0 && (
+              {/* Portfolio Files (view/download) */}
+              {Array.isArray(freelancer.portfolio_files) && freelancer.portfolio_files.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-3">Languages</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">Portfolio Files</h4>
+                  <ul className="space-y-2">
+                    {freelancer.portfolio_files.map((f) => (
+                      <li key={f.id} className="flex items-center justify-between border rounded-lg px-3 py-2 hover:bg-gray-50">
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900 truncate">{f.file_name || 'File'}</div>
+                          <div className="text-gray-500 text-xs">{((f.file_size || 0) / 1024).toFixed(1)} KB</div>
+                        </div>
+                        <a
+                          href={f.file_url || (f.file && f.file)}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs font-semibold"
+                        >
+                          View / Download
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Languages — robust render for string or object with name/language */}
+              {Array.isArray(freelancer.languages) && freelancer.languages.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="font-semibold text-gray-900 mb-3">Languages</h4>
                   <div className="flex flex-wrap gap-2">
                     {freelancer.languages.map((lang, idx) => (
-                      <span key={idx} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                        {typeof lang === 'string' ? lang : lang.name}
+                      <span key={idx} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
+                        {typeof lang === 'string'
+                          ? lang
+                          : (lang?.name || lang?.language || 'Language')}
+                        {lang && (lang.level || lang.proficiency)
+                          ? ` • ${lang.level || lang.proficiency}`
+                          : ''}
                       </span>
                     ))}
                   </div>
@@ -240,15 +273,17 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
               {/* Experience */}
               {freelancer.experiences && freelancer.experiences.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-3">Experience</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">Experience</h4>
                   <div className="space-y-4">
                     {freelancer.experiences.map((exp, idx) => (
                       <div key={idx} className="border-l-2 border-purple-500 pl-4">
                         <h5 className="font-semibold text-gray-900">{exp.title || exp.position}</h5>
-                        <p className="text-sm text-gray-600">{exp.company}</p>
-                        <p className="text-xs text-gray-500">{exp.duration || exp.period}</p>
+                        <p className="text-gray-600">{exp.company}</p>
+                        <p className="text-gray-500 text-xs">
+                          {exp.startDate || exp.start || '—'} → {exp.endDate || exp.end || (exp.current ? 'Present' : '—')}
+                        </p>
                         {exp.description && (
-                          <p className="text-sm text-gray-700 mt-2">{exp.description}</p>
+                          <p className="text-gray-700 mt-2">{exp.description}</p>
                         )}
                       </div>
                     ))}
@@ -259,13 +294,13 @@ export default function FreelancerCard({ freelancer, showChatButton = true }) {
               {/* Education */}
               {freelancer.education && freelancer.education.length > 0 && (
                 <div className="mb-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-3">Education</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">Education</h4>
                   <div className="space-y-3">
                     {freelancer.education.map((edu, idx) => (
                       <div key={idx} className="border-l-2 border-purple-500 pl-4">
                         <h5 className="font-semibold text-gray-900">{edu.degree || edu.title}</h5>
-                        <p className="text-sm text-gray-600">{edu.institution || edu.school}</p>
-                        <p className="text-xs text-gray-500">{edu.year || edu.period}</p>
+                        <p className="text-gray-600">{edu.institution || edu.school}</p>
+                        <p className="text-gray-500 text-xs">{edu.field ? `${edu.field} • ` : ''}{edu.year || edu.period}</p>
                       </div>
                     ))}
                   </div>
