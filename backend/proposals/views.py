@@ -1,6 +1,4 @@
 from django.shortcuts import render
-
-# backend/proposals/views.py
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,11 +12,25 @@ class ProposalViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        if self.request.user.role == 'freelancer':
-            return Proposal.objects.filter(freelancer=self.request.user)
-        elif self.request.user.role == 'client':
-            return Proposal.objects.filter(project__client=self.request.user)
-        return Proposal.objects.none()
+        user = self.request.user
+        
+        if user.role == 'freelancer':
+            queryset = Proposal.objects.filter(freelancer=user)
+        elif user.role == 'client':
+            queryset = Proposal.objects.filter(project__client=user)
+        else:
+            queryset = Proposal.objects.none()
+        
+        print(f"[Proposals] User: {user.email}, Role: {user.role}, Count: {queryset.count()}")
+        
+        return queryset.select_related(
+            'project', 
+            'freelancer', 
+            'freelancer__freelancer_profile'
+        ).prefetch_related(
+            'freelancer__freelancer_profile__skills',
+            'freelancer__freelancer_profile__portfolio_files'
+        ).order_by('-created_at')
 
     def create(self, request, *args, **kwargs):
         project_id = request.data.get('project')
@@ -26,6 +38,25 @@ class ProposalViewSet(viewsets.ModelViewSet):
             project = Project.objects.get(id=project_id)
         except Project.DoesNotExist:
             return Response({'detail': 'Project not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if project is still open
+        if project.status != 'open':
+            return Response(
+                {'detail': 'This project is no longer accepting proposals.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if freelancer already submitted a proposal
+        existing_proposal = Proposal.objects.filter(
+            project=project,
+            freelancer=request.user
+        ).first()
+        
+        if existing_proposal:
+            return Response(
+                {'detail': 'You have already submitted a proposal for this project.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         proposal_data = {
             'project': project.id,
@@ -44,13 +75,23 @@ class ProposalViewSet(viewsets.ModelViewSet):
         proposal = self.get_object()
         if proposal.project.client != request.user:
             return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # Reject all other pending proposals
+        Proposal.objects.filter(
+            project=proposal.project,
+            status='pending'
+        ).exclude(id=proposal.id).update(status='rejected')
+        
         proposal.status = 'accepted'
         proposal.save()
+        
         from contracts.models import Contract
-        Contract.objects.create(
+        Contract.objects.get_or_create(
             proposal=proposal,
-            terms='Project terms',
-            payment_terms='On completion'
+            defaults={
+                'terms': 'Project terms as discussed',
+                'payment_terms': 'Payment on completion'
+            }
         )
         return Response({'detail': 'Proposal accepted. Contract created.'}, status=status.HTTP_200_OK)
 

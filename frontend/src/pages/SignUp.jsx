@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from 'react'; 
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { authAPI } from '../api/auth';
 
@@ -15,6 +15,8 @@ export default function SignUp({ setUser }) {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);   
+  const [showPwd2, setShowPwd2] = useState(false); 
   const navigate = useNavigate();
 
   // Show/Hide states
@@ -67,6 +69,7 @@ export default function SignUp({ setUser }) {
       // Get user data
       const userResponse = await authAPI.me();
       setUser(userResponse.data);
+      localStorage.setItem('user', JSON.stringify(userResponse.data)); 
       console.log('User data loaded:', userResponse.data);
 
       // Navigate based on role

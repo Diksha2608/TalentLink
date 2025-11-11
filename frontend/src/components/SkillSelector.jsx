@@ -1,11 +1,18 @@
-// frontend/src/components/SkillSelector.jsx
+
 import { useState, useEffect } from 'react';
+import { Search, Plus, X, Loader } from 'lucide-react';
 import client from '../api/client';
 
-export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
+export default function SkillSelector({ selectedSkills = [], setSelectedSkills }) {
   const [allSkills, setAllSkills] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customSkillName, setCustomSkillName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
 
+  useEffect(() => { loadSkills(); }, []);
   useEffect(() => {
     client
       .get('/skills/')
@@ -33,12 +40,38 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
     : [];
 
   const toggleSkill = (skill) => {
-    if (selectedSkills.find((s) => s.id === skill.id)) {
-      setSelectedSkills(selectedSkills.filter((s) => s.id !== skill.id));
+    const safeSelected = Array.isArray(selectedSkills) ? selectedSkills : [];
+    if (safeSelected.find((s) => s.id === skill.id)) {
+      setSelectedSkills(safeSelected.filter((s) => s.id !== skill.id));
     } else {
-      setSelectedSkills([...selectedSkills, skill]);
+      setSelectedSkills([...safeSelected, skill]);
     }
   };
+
+  const createCustomSkill = async () => {
+    if (!customSkillName.trim()) return setError('Please enter a skill name');
+    if (customSkillName.length < 2) return setError('Skill name must be at least 2 characters');
+
+    setCreating(true);
+    setError('');
+    try {
+      const response = await client.post('/skills/create_custom/', { name: customSkillName.trim() });
+      const newSkill = response.data;
+      setAllSkills([newSkill, ...allSkills]);
+      const safeSelected = Array.isArray(selectedSkills) ? selectedSkills : [];
+      setSelectedSkills([...safeSelected, newSkill]);
+      setCustomSkillName(''); setShowCustomInput(false); setSearchTerm('');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to create skill');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const safeSelectedSkills = Array.isArray(selectedSkills) ? selectedSkills : [];
+  const filteredSkills = Array.isArray(allSkills)
+    ? allSkills.filter(skill => !safeSelectedSkills.find(s => s.id === skill.id))
+    : [];
 
   return (
     <div>
@@ -59,9 +92,14 @@ export default function SkillSelector({ selectedSkills, setSelectedSkills }) {
             className="px-3 py-1 bg-purple-600 text-white rounded-full text-sm cursor-pointer"
             onClick={() => toggleSkill(skill)}
           >
-            {skill.name} ×
-          </span>
-        ))}
+            <X size={18} />
+          </button>
+        )}
+
+        {/* Loader stays at the far right */}
+        {loading && (
+          <Loader className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" size={20} />
+        )}
       </div>
 
       {/* All skills list */}
