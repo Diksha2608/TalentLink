@@ -1,6 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { CheckCircle, Clock, AlertCircle, FileText, User, Calendar, DollarSign, ArrowLeft } from 'lucide-react';
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  FileText,
+  User,
+  Calendar,
+  DollarSign,
+  ArrowLeft
+} from 'lucide-react';
 import { contractsAPI } from '../api/contracts';
 
 export default function ContractDetail({ user }) {
@@ -43,10 +52,8 @@ export default function ContractDetail({ user }) {
   };
 
   const handleCompleteContract = async () => {
-    if (!window.confirm('Are you sure you want to mark this contract as completed?')) {
-      return;
-    }
-    
+    if (!window.confirm('Are you sure you want to mark this contract as completed?')) return;
+
     try {
       setActionLoading(true);
       await contractsAPI.complete(id);
@@ -90,11 +97,15 @@ export default function ContractDetail({ user }) {
     );
   }
 
-  const canSign = contract.status === 'pending' &&
+  const canSign =
+    contract.status === 'pending' &&
     ((user.role === 'client' && !contract.client_signed) ||
-     (user.role === 'freelancer' && !contract.freelancer_signed));
+      (user.role === 'freelancer' && !contract.freelancer_signed));
 
   const canComplete = contract.status === 'active' && user.role === 'client';
+
+  // ✅ Unified title for both job and project contracts
+  const title = contract.job_title || contract.project_title || `Contract #${contract.id}`;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -113,7 +124,7 @@ export default function ContractDetail({ user }) {
           {/* Header */}
           <div className="flex justify-between items-start mb-6 pb-6 border-b">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{contract.project_title}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{title}</h1>
               <p className="text-gray-600">Contract ID: #{contract.id}</p>
             </div>
             <span
@@ -265,16 +276,25 @@ export default function ContractDetail({ user }) {
           </div>
         </div>
 
-        {/* Related Project Link */}
-        {contract.proposal?.project && (
+        {/* Related Links */}
+        {(contract.proposal?.project || contract.job_application?.job) && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Related Project</h3>
-            <Link
-              to={`/projects/${contract.proposal.project}`}
-              className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
-            >
-              View Project Details →
-            </Link>
+            <h3 className="font-semibold text-gray-900 mb-3">Related Work</h3>
+            {contract.proposal?.project ? (
+              <Link
+                to={`/projects/${contract.proposal.project}`}
+                className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
+              >
+                View Project Details →
+              </Link>
+            ) : (
+              <Link
+                to={`/jobs/${contract.job_application.job}`}
+                className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
+              >
+                View Job Details →
+              </Link>
+            )}
           </div>
         )}
       </div>
