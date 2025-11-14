@@ -1,9 +1,12 @@
+# backend/projects/models.py
+
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 from users.models import Skill
 
 User = get_user_model()
+
 
 class Project(models.Model):
     STATUS_CHOICES = (
@@ -43,6 +46,9 @@ class Project(models.Model):
         ('onsite', 'Onsite'),
     )
 
+    # ============================================================
+    # MAIN PROJECT FIELDS
+    # ============================================================
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects_posted')
     title = models.CharField(max_length=200)
     description = models.TextField()
@@ -51,7 +57,10 @@ class Project(models.Model):
     budget_min = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     budget_max = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
 
+    # Duration fields
     duration = models.CharField(max_length=20, choices=DURATION_CHOICES, default='less_1_month')
+    duration_estimate = models.CharField(max_length=100, blank=True, null=True)  # ✅ Added for seeder compatibility
+
     hours_per_week = models.CharField(max_length=20, choices=HOURS_PER_WEEK_CHOICES, default='less_30')
     job_type = models.CharField(max_length=10, choices=JOB_TYPE_CHOICES, default='fixed')
 
@@ -59,15 +68,23 @@ class Project(models.Model):
     location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='remote')
     client_location = models.CharField(max_length=200, blank=True, null=True)
 
+    # Payment fields
     fixed_payment = models.IntegerField(null=True, blank=True)
     hourly_min = models.IntegerField(null=True, blank=True)
     hourly_max = models.IntegerField(null=True, blank=True)
 
+    # Status and visibility
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
-    visibility = models.CharField(max_length=20, choices=[('public', 'Public'), ('private', 'Private')], default='public')
+    visibility = models.CharField(
+        max_length=20,
+        choices=[('public', 'Public'), ('private', 'Private')],
+        default='public'
+    )
 
+    # Attachments
     attachments = models.JSONField(default=list, blank=True)
 
+    # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     category = models.CharField(max_length=200, blank=True, null=True)
@@ -79,6 +96,9 @@ class Project(models.Model):
         return self.title
 
 
+# ============================================================
+# PROJECT ATTACHMENT MODEL
+# ============================================================
 class ProjectAttachment(models.Model):
     """
     Files attached to a Project (downloadable by freelancers).
