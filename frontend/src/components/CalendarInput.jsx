@@ -17,7 +17,8 @@ export default function CalendarInput({
   value,               // "YYYY-MM-DD"
   onChange,            // (val) => void
   placeholder = "YYYY-MM-DD",
-  className = ""
+  className = "",
+  disabled = false     // NEW: support disabled state
 }) {
   const [open, setOpen] = useState(false);
   const inputRef = useRef(null);
@@ -70,6 +71,7 @@ export default function CalendarInput({
   }
 
   function onIconClick(){
+    if (disabled) return; // Don't open if disabled
     setOpen(o => !o);
     
     const dt = parseYMD(inputRef.current?.value);
@@ -85,19 +87,25 @@ export default function CalendarInput({
           placeholder={placeholder}
           value={value || ""}
           onChange={(e)=>onChange?.(e.target.value)}
-          className="w-full px-9 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+          disabled={disabled}
+          className={`w-full px-9 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 ${
+            disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+          }`}
         />
         <button
           type="button"
           onClick={onIconClick}
-          className="absolute left-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
+          disabled={disabled}
+          className={`absolute left-2 top-1/2 -translate-y-1/2 p-1 rounded ${
+            disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-100'
+          }`}
           aria-label="Open calendar"
         >
           <CalendarIcon size={16} className="text-gray-600" />
         </button>
       </div>
 
-      {open && (
+      {open && !disabled && (
         <div
           ref={popRef}
           className="absolute z-50 mt-2 w-72 bg-white border rounded-xl shadow-lg p-3"

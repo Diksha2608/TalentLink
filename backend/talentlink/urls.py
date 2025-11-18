@@ -16,11 +16,10 @@ from users.views import (
 )
 from projects.views import ProjectViewSet
 from proposals.views import ProposalViewSet
-from contracts.views import ContractViewSet, ReviewViewSet
+from contracts.views import ContractViewSet, ReviewViewSet, ReviewStatsView
 from messaging.views import MessageViewSet
 from notifications.views import NotificationViewSet
 from jobs.views import JobViewSet, JobApplicationViewSet
-
 
 # ====== ROOT RESPONSE ======
 def api_root(request):
@@ -49,6 +48,7 @@ router.register(r'proposals', ProposalViewSet, basename='proposal')
 # ✅ Contracts & Reviews (added properly here)
 router.register(r'contracts', ContractViewSet, basename='contract')
 router.register(r'reviews', ReviewViewSet, basename='review')
+router.register(r'review-stats', ReviewStatsView, basename='review-stats')
 
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'notifications', NotificationViewSet, basename='notification')
@@ -69,6 +69,7 @@ urlpatterns = [
     # 💬 Optional: Include other app-specific URLs
     path('api/messages/', include('messaging.urls')),
     path('api/jobs/', include('jobs.urls')),
+    path('api/saved-items/', include('saved_items.urls')),
 ]
 
 

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  DollarSign,
+  IndianRupee,
   Calendar,
   MapPin,
   Award,
   Trash2,
   CheckCircle,
+  Edit,
 } from "lucide-react";
 import { jobsAPI } from "../api/jobs";
 import { jobApplicationsAPI } from "../api/jobApplications";
@@ -208,14 +209,25 @@ export default function JobDetail({ user }) {
 
           {/* DELETE BUTTON */}
           {user?.id === job.client && (
-            <button
-              onClick={handleDeleteJob}
-              className="mt-4 px-4 py-2 bg-red-50 border border-red-300 text-red-700 rounded-lg flex items-center gap-2 hover:bg-red-100"
-            >
-              <Trash2 size={16} /> Delete Job
-            </button>
+            <div className="flex gap-2 mt-4">
+              {/* Only allow edit if no applications received */}
+              {applications.length === 0 && (
+                <button
+                  onClick={() => navigate(`/jobs/${job.id}/edit`)}
+                  className="px-4 py-2 bg-blue-50 border border-blue-300 text-blue-700 rounded-lg flex items-center gap-2 hover:bg-blue-100"
+                >
+                  <Edit size={16} /> Edit Job
+                </button>
+              )}
+              
+              <button
+                onClick={handleDeleteJob}
+                className="px-4 py-2 bg-red-50 border border-red-300 text-red-700 rounded-lg flex items-center gap-2 hover:bg-red-100"
+              >
+                <Trash2 size={16} /> Delete Job
+              </button>
+            </div>
           )}
-
           {/* DESCRIPTION */}
           <p className="mt-6 text-gray-700 text-lg leading-relaxed">
             {job.description}
@@ -225,7 +237,7 @@ export default function JobDetail({ user }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 bg-gray-50 p-6 rounded-lg">
             <div>
               <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <DollarSign size={18} className="text-green-600" />
+                <IndianRupee size={18} className="text-green-600" />
                 <span className="text-sm font-medium">Payment</span>
               </div>
               <span className="text-xl font-bold text-green-600">

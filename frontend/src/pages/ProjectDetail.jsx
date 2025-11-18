@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  DollarSign, Clock, Calendar, X, CheckCircle, MessageCircle, Trash2,
+  IndianRupee, Clock, Calendar, X, CheckCircle, MessageCircle, Trash2,
   MapPin, Star, Briefcase, Award, FileText, LogIn
 } from 'lucide-react';
 import { projectsAPI } from '../api/projects';
@@ -17,9 +17,11 @@ const DURATION_MAP = {
   '6_plus_months': '6+ months',
 };
 const HOURS_MAP = {
-  less_30: 'Less than 30 hrs/week',
+  less_10: 'Less than 10 hrs/week',
+  '10_30': '10–30 hrs/week',
   more_30: 'More than 30 hrs/week',
 };
+
 const EXPERIENCE_MAP = { entry: 'Entry Level', intermediate: 'Intermediate', expert: 'Expert' };
 const LOCATION_MAP = { remote: 'Remote', hybrid: 'Hybrid', onsite: 'Onsite' };
 
@@ -227,6 +229,12 @@ export default function ProjectDetail({ user }) {
 
           {user?.id === project.client && (
             <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => navigate(`/projects/${project.id}/edit`)}
+              className="px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg flex items-center gap-2 text-sm"
+            >
+              <LogIn size={16} /> Edit Project
+            </button>
               <button
                 onClick={handleDeleteProject}
                 className="px-3 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg flex items-center gap-2 text-sm"
@@ -251,7 +259,7 @@ export default function ProjectDetail({ user }) {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-6 rounded-lg">
             <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-gray-600 mb-1"><DollarSign size={18} /><span className="text-sm font-medium">Budget</span></div>
+              <div className="flex items-center gap-2 text-gray-600 mb-1"><IndianRupee size={18} /><span className="text-sm font-medium">Budget</span></div>
               <span className="text-lg font-bold text-gray-900">
                 {project.job_type === 'fixed' && project.fixed_payment
                   ? formatCurrency(project.fixed_payment)

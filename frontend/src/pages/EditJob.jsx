@@ -1,9 +1,13 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// frontend/src/pages/EditJob.jsx
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { jobsAPI } from '../api/jobs'; 
+import { jobsAPI } from '../api/jobs';
 
-export default function PostJob({ user }) {
+export default function EditJob({ user }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -16,13 +20,56 @@ export default function PostJob({ user }) {
     fixed_amount: '',
   });
   const [files, setFiles] = useState([]);
+  const [existingFiles, setExistingFiles] = useState([]);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    loadJob();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const loadJob = async () => {
+    try {
+      setError('');
+      setLoading(true);
+
+      const res = await jobsAPI.get(id);
+      const job = res.data;
+
+      // Only owner client can edit
+      if (!user || user.role !== 'client' || user.id !== job.client) {
+        alert('You can only edit your own jobs');
+        navigate('/dashboard/client');
+        return;
+      }
+
+      setFormData({
+        title: job.title || '',
+        description: job.description || '',
+        job_type: job.job_type || 'hourly',
+        experience_level: job.experience_level || 'intermediate',
+        location_type: job.location_type || 'remote',
+        location: job.location || '',
+        hourly_min: job.hourly_min || '',
+        hourly_max: job.hourly_max || '',
+        fixed_amount: job.fixed_amount || '',
+      });
+
+      setExistingFiles(job.file_attachments || []);
+    } catch (err) {
+      console.error('Failed to load job:', err);
+      setError('Failed to load job details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onPickFiles = (e) => {
     const picked = Array.from(e.target.files || []);
-    setFiles(prev => [...prev, ...picked].slice(0, 2)); // max 2
+    // same as PostJob: max 2 files total
+    setFiles(prev => [...prev, ...picked].slice(0, 2));
   };
 
   const removeFile = (idx) => {
@@ -32,23 +79,24 @@ export default function PostJob({ user }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setSubmitting(true);
 
+    // Same validation as PostJob.jsx
     if (formData.job_type === 'hourly') {
       if (!formData.hourly_min || !formData.hourly_max) {
         setError('Please enter hourly rate range');
-        setLoading(false);
+        setSubmitting(false);
         return;
       }
       if (parseFloat(formData.hourly_min) >= parseFloat(formData.hourly_max)) {
         setError('Maximum hourly rate must be greater than minimum');
-        setLoading(false);
+        setSubmitting(false);
         return;
       }
     } else if (formData.job_type === 'fixed') {
       if (!formData.fixed_amount || parseFloat(formData.fixed_amount) <= 0) {
         setError('Please enter a valid fixed amount');
-        setLoading(false);
+        setSubmitting(false);
         return;
       }
     }
@@ -71,17 +119,33 @@ export default function PostJob({ user }) {
 
       files.forEach((f) => fd.append('attachments', f));
 
-      await jobsAPI.create(fd);
+      await jobsAPI.update(id, fd);
 
-      navigate('/dashboard/client');
+      navigate(`/jobs/${id}`);
     } catch (err) {
-      console.error('Job creation error:', err);
-      setError(err?.response?.data?.detail || err.message || 'Failed to create job. Please try again.');
+      console.error('Job update error:', err);
+      const msg =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to update job';
+      setError(msg);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-12 w-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-600">Loading job details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Optional guard for freelancers (like PostJob)
   if (user?.role === 'freelancer') {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -102,8 +166,8 @@ export default function PostJob({ user }) {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="mb-6">
-          <h1 className="text-4xl font-bold text-gray-900">Post a New Job</h1>
-          <p className="text-gray-600 mt-2">Find the perfect freelancer for hourly or fixed-price work</p>
+          <h1 className="text-4xl font-bold text-gray-900">Edit Job</h1>
+          <p className="text-gray-600 mt-2">Update job details</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-8 space-y-6">
@@ -170,7 +234,7 @@ export default function PostJob({ user }) {
               </button>
             </div>
           </div>
-          
+
           {/* Experience Level */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -262,9 +326,40 @@ export default function PostJob({ user }) {
             </div>
           </div>
 
-          {/* Attachments (max 2) */}
+          {/* Existing Attachments (read-only list) */}
+          {existingFiles.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Existing Attachments
+              </label>
+              <ul className="mt-1 space-y-2">
+                {existingFiles.map((att) => (
+                  <li
+                    key={att.id}
+                    className="flex items-center justify-between border rounded-lg px-3 py-2 bg-gray-50"
+                  >
+                    <span className="text-sm truncate">
+                      {att.original_name || 'Attachment'}
+                    </span>
+                    <a
+                      href={att.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+                    >
+                      Download
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* New Attachments (max 2, like PostJob) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Attachments (max 2)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Add Attachments (max 2)
+            </label>
             <input
               type="file"
               onChange={onPickFiles}
@@ -276,7 +371,10 @@ export default function PostJob({ user }) {
                 {files.map((f, idx) => (
                   <li key={idx} className="flex items-center justify-between border rounded-lg px-3 py-2">
                     <span className="text-sm truncate">
-                      {f.name} <span className="text-gray-500">({(f.size / 1024).toFixed(1)} KB)</span>
+                      {f.name}{' '}
+                      <span className="text-gray-500">
+                        ({(f.size / 1024).toFixed(1)} KB)
+                      </span>
                     </span>
                     <button
                       type="button"
@@ -296,17 +394,17 @@ export default function PostJob({ user }) {
           <div className="flex gap-4 pt-4">
             <button
               type="button"
-              onClick={() => navigate('/dashboard/client')}
+              onClick={() => navigate(`/jobs/${id}`)}
               className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={submitting}
               className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Posting Job...' : 'Post Job'}
+              {submitting ? 'Updating Job...' : 'Update Job'}
             </button>
           </div>
         </form>

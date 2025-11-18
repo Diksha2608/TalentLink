@@ -1,10 +1,18 @@
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from .models import Contract, Review
-from .serializers import ContractSerializer, ReviewSerializer
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework import filters
+from .models import Contract, Review, ReviewResponse
+from .serializers import (
+    ContractSerializer, 
+    ReviewSerializer, 
+    PlatformReviewCreateSerializer,
+    ExternalReviewCreateSerializer,
+    ReviewResponseSerializer
+)
 from notifications.models import Notification
 
 
@@ -133,58 +141,228 @@ class ContractViewSet(viewsets.ModelViewSet):
         return Response({'detail': 'Contract marked as completed successfully.'},
                         status=status.HTTP_200_OK)
 
-
 # ============================================================
-# REVIEW VIEWSET
+# REVIEW VIEWSET (Enhanced)
 # ============================================================
 class ReviewViewSet(viewsets.ModelViewSet):
     """
-    Handles creation and viewing of reviews between clients and freelancers.
+    Handles creation and viewing of reviews.
+    Supports both platform reviews (from contracts) and external reviews.
     """
-    serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['created_at', 'rating']
+    ordering = ['-created_at']
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            # Determine review type from request data
+            review_type = self.request.data.get('review_type', 'platform')
+            if review_type == 'external':
+                return ExternalReviewCreateSerializer
+            return PlatformReviewCreateSerializer
+        return ReviewSerializer
 
     def get_queryset(self):
+        """Return reviews given or received by the user"""
         user = self.request.user
-        return Review.objects.filter(Q(reviewer=user) | Q(reviewee=user)).select_related('contract')
+        queryset = Review.objects.filter(
+            Q(reviewer=user) | Q(reviewee=user)
+        ).select_related('contract', 'reviewer', 'reviewee', 'response')
+
+        # Filter by review type
+        review_type = self.request.query_params.get('review_type')
+        if review_type:
+            queryset = queryset.filter(review_type=review_type)
+
+        # Filter by verification status
+        verified = self.request.query_params.get('verified')
+        if verified is not None:
+            queryset = queryset.filter(is_verified=verified.lower() == 'true')
+
+        return queryset
 
     def create(self, request, *args, **kwargs):
-        """
-        Create a review for a completed contract.
-        """
-        serializer = self.get_serializer(data=request.data)
+        """Create a review (platform or external)"""
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
+        review = serializer.save()
 
-        contract = serializer.validated_data['contract']
-        reviewer = request.user
+        # Send notification for platform reviews
+        if review.review_type == 'platform' and review.reviewee:
+            Notification.objects.create(
+                user=review.reviewee,
+                type='REVIEW',
+                title='New Review Received',
+                message=f'You received a {review.rating}-star review from {review.reviewer.get_full_name() or review.reviewer.username}.',
+                metadata={'review_id': review.id}
+            )
+        
+        # For external reviews, send verification email
+        elif review.review_type == 'external':
+            # TODO: Send verification email
+            pass
 
-        if contract.status != 'completed':
-            return Response({'detail': 'You can only review completed contracts.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # Determine who is being reviewed
-        if reviewer == contract.client:
-            reviewee = contract.freelancer
-        elif reviewer == contract.freelancer:
-            reviewee = contract.client
-        else:
-            return Response({'detail': 'You are not part of this contract.'},
-                            status=status.HTTP_403_FORBIDDEN)
-
-        # Prevent duplicate reviews
-        if Review.objects.filter(contract=contract, reviewer=reviewer).exists():
-            return Response({'detail': 'You have already reviewed this contract.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        review = serializer.save(reviewer=reviewer, reviewee=reviewee)
-
-        # Send notification
-        Notification.objects.create(
-            user=reviewee,
-            type='REVIEW',
-            title='New Review Received',
-            message=f'You received a {review.rating}-star review from {reviewer.get_full_name() or reviewer.username}.',
-            metadata={'contract_id': contract.id, 'review_id': review.id}
+        return Response(
+            ReviewSerializer(review, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
         )
 
-        return Response(ReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def for_user(self, request):
+        """Get all verified reviews for a specific user (public endpoint)"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response(
+                {'detail': 'user_id parameter is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'User not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # 🔹 NEW: optional filter by review_type = 'platform' / 'external'
+        review_type = request.query_params.get('review_type')
+        
+        reviews = Review.objects.filter(
+            reviewee=user,
+            is_verified=True
+        ).select_related('reviewer', 'reviewee', 'response').order_by('-created_at')
+
+        if review_type in ['platform', 'external']:
+            reviews = reviews.filter(review_type=review_type)
+
+        # Pagination
+        page = self.paginate_queryset(reviews)
+        if page is not None:
+            serializer = ReviewSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = ReviewSerializer(reviews, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def respond(self, request, pk=None):
+        """Add a response to a review (only reviewee can respond)"""
+        review = self.get_object()
+        
+        if review.reviewee != request.user:
+            return Response(
+                {'detail': 'Only the reviewee can respond to this review.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Check if response already exists
+        if hasattr(review, 'response'):
+            return Response(
+                {'detail': 'You have already responded to this review.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = ReviewResponseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        response = serializer.save(review=review)
+
+        return Response(
+            ReviewResponseSerializer(response).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
+    def verify(self, request, pk=None):
+        """Verify an external review using the verification token"""
+        review = self.get_object()
+        
+        if review.review_type != 'external':
+            return Response(
+                {'detail': 'Only external reviews need verification.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if review.is_verified:
+            return Response(
+                {'detail': 'Review is already verified.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        token = request.data.get('token')
+        if not token or token != review.verification_token:
+            return Response(
+                {'detail': 'Invalid verification token.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        review.is_verified = True
+        review.verified_at = timezone.now()
+        review.save()
+
+        # Update reviewee's rating
+        review.update_reviewee_rating()
+
+        # Notify reviewee
+        Notification.objects.create(
+            user=review.reviewee,
+            type='REVIEW',
+            title='External Review Verified',
+            message=f'A {review.rating}-star external review from {review.reviewer_name} has been verified.',
+            metadata={'review_id': review.id}
+        )
+
+        return Response({
+            'detail': 'Review verified successfully.',
+            'review': ReviewSerializer(review, context={'request': request}).data
+        }, status=status.HTTP_200_OK)
+
+
+# ============================================================
+# REVIEW STATISTICS
+# ============================================================
+class ReviewStatsView(viewsets.ViewSet):
+    """Get review statistics for a user"""
+    permission_classes = [AllowAny]
+
+    @action(detail=False, methods=['get'])
+    def for_user(self, request):
+        """Get review stats for a specific user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response(
+                {'detail': 'user_id parameter is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'User not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        verified_reviews = Review.objects.filter(reviewee=user, is_verified=True)
+        
+        stats = {
+            'total_reviews': verified_reviews.count(),
+            'average_rating': user.rating_avg,
+            'rating_distribution': {
+                '5': verified_reviews.filter(rating=5).count(),
+                '4': verified_reviews.filter(rating=4).count(),
+                '3': verified_reviews.filter(rating=3).count(),
+                '2': verified_reviews.filter(rating=2).count(),
+                '1': verified_reviews.filter(rating=1).count(),
+            },
+            'platform_reviews': verified_reviews.filter(review_type='platform').count(),
+            'external_reviews': verified_reviews.filter(review_type='external').count(),
+        }
+
+        return Response(stats)

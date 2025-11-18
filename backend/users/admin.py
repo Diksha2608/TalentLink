@@ -95,12 +95,15 @@ class SkillAdmin(admin.ModelAdmin):
 # -------------------------
 # Client profile
 # -------------------------
+
 @admin.register(ClientProfile)
 class ClientProfileAdmin(admin.ModelAdmin):
     list_display = [
         'user', 'company_name', 'is_verified',
         'verification_submitted_at', 'id_document_link',
-        'projects_posted', 'active_projects', 'created_at'
+        'projects_posted', 'active_projects', 'completed_projects',
+        'jobs_posted', 'active_jobs', 'completed_jobs',
+        'created_at',
     ]
     list_filter = ['is_verified', 'created_at', 'verification_submitted_at']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'company_name']
@@ -111,7 +114,12 @@ class ClientProfileAdmin(admin.ModelAdmin):
         ('Verification', {
             'fields': ('id_document', 'id_document_preview', 'is_verified', 'verification_submitted_at')
         }),
-        ('Stats', {'fields': ('projects_posted', 'active_projects')}),
+        ('Stats', {
+            'fields': (
+                'projects_posted', 'active_projects', 'completed_projects',
+                'jobs_posted', 'active_jobs', 'completed_jobs',
+            )
+        }),
     )
 
     actions = ['approve_verification', 'revoke_verification']

@@ -25,6 +25,62 @@ class UserViewSet(viewsets.ModelViewSet):
    
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
 
+    def get_queryset(self):
+        """
+        Filter users based on query parameters.
+        Supports role, search, location, and min_rating filters.
+        """
+        queryset = User.objects.all()
+        
+        # Filter by role (e.g., role=client)
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+        
+        # Search by name, email, or bio
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(bio__icontains=search)
+            )
+        
+        # Filter by location
+        location = self.request.query_params.get('location')
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+        
+        # Filter by minimum rating
+        min_rating = self.request.query_params.get('min_rating')
+        if min_rating:
+            try:
+                queryset = queryset.filter(rating_avg__gte=float(min_rating))
+            except ValueError:
+                pass
+        
+        # Filter verified clients only
+        verified = self.request.query_params.get('verified')
+        if verified == 'true':
+            queryset = queryset.filter(
+                role='client',
+                client_profile__is_verified=True
+            )
+        
+        # Filter by minimum projects for clients
+        min_projects = self.request.query_params.get('min_projects')
+        if min_projects:
+            try:
+                queryset = queryset.filter(
+                    role='client',
+                    client_profile__projects_posted__gte=int(min_projects)
+                )
+            except ValueError:
+                pass
+        
+        return queryset.distinct()
+
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
         serializer = UserRegistrationSerializer(data=request.data)

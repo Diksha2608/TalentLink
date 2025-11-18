@@ -6,7 +6,7 @@ import {
   FileText,
   CheckCircle,
   Users,
-  DollarSign,
+  IndianRupee,
   Clock,
   MapPin,
   Award,
@@ -77,18 +77,37 @@ export default function ClientDashboard({ user }) {
 
       // ✅ Final combined total
       const totalProposals = projectProposalCount + jobApplicationCount;
+      // ✅ Project-only counts
+      const activeProjectCount = myProjects.filter((p) =>
+        ['open', 'in_progress'].includes(p.status)
+      ).length;
+      const completedProjectCount = myProjects.filter(
+        (p) => p.status === 'completed'
+      ).length;
 
-      // ✅ Stats updated
+      // ✅ Job-only counts
+      const activeJobCount = myJobs.filter((j) =>
+        ['open', 'in_progress'].includes(j.status)
+      ).length;
+      const completedJobCount = myJobs.filter(
+        (j) => j.status === 'completed'
+      ).length;
+
       setStats({
-        totalProjects: myProjects.length + myJobs.length,
-        activeProjects:
-          myProjects.filter((p) => ['open', 'in_progress'].includes(p.status)).length +
-          myJobs.filter((j) => ['open', 'in_progress'].includes(j.status)).length,
+        // Projects only
+        totalProjects: myProjects.length,
+        activeProjects: activeProjectCount,
+        completedProjects: completedProjectCount,
+
+        // Jobs only (for separate cards / UI)
+        totalJobs: myJobs.length,
+        activeJobs: activeJobCount,
+        completedJobs: completedJobCount,
+
+        // Proposals from both
         totalProposals: totalProposals,
-        completedProjects:
-          myProjects.filter((p) => p.status === 'completed').length +
-          myJobs.filter((j) => j.status === 'completed').length,
       });
+
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     }
@@ -132,11 +151,81 @@ export default function ClientDashboard({ user }) {
 
         {/* STATS */}
         <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <DashboardCard title="Total Projects" value={stats.totalProjects} icon={Briefcase} color="purple" />
-          <DashboardCard title="Active Projects" value={stats.activeProjects} icon={FileText} color="blue" />
-          <DashboardCard title="Proposals Received" value={stats.totalProposals} icon={Users} color="orange" />
-          <DashboardCard title="Completed" value={stats.completedProjects} icon={CheckCircle} color="green" />
+          <DashboardCard
+            title="Total Projects"
+            value={stats.totalProjects}
+            icon={Layers}
+            color="purple"
+          />
+          <DashboardCard
+            title="Active Projects"
+            value={stats.activeProjects}
+            icon={FileText}
+            color="blue"
+          />
+          <DashboardCard
+            title="Jobs Posted"
+            value={stats.totalJobs}
+            icon={Briefcase}
+            color="orange"
+          />
+          <DashboardCard
+            title="Proposals Received"
+            value={stats.totalProposals}
+            icon={Users}
+            color="green"
+          />
         </div>
+        {/* Your Activity summary */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">Your Activity</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+            {/* Completed Projects */}
+            <div className="border rounded-lg p-4 flex flex-col gap-1">
+              <span className="text-gray-500">Completed Projects</span>
+              <span className="text-2xl font-bold text-green-600">
+                {stats.completedProjects}
+              </span>
+              <span className="text-xs text-gray-500">
+                Projects marked as completed via contracts
+              </span>
+            </div>
+
+            {/* Active Projects */}
+            <div className="border rounded-lg p-4 flex flex-col gap-1">
+              <span className="text-gray-500">Active Projects</span>
+              <span className="text-2xl font-bold text-blue-600">
+                {stats.activeProjects}
+              </span>
+              <span className="text-xs text-gray-500">
+                Open or in-progress projects
+              </span>
+            </div>
+
+            {/* Completed Jobs */}
+            <div className="border rounded-lg p-4 flex flex-col gap-1">
+              <span className="text-gray-500">Completed Jobs</span>
+              <span className="text-2xl font-bold text-green-700">
+                {stats.completedJobs}
+              </span>
+              <span className="text-xs text-gray-500">
+                Jobs completed via contracts
+              </span>
+            </div>
+
+            {/* Active Jobs */}
+            <div className="border rounded-lg p-4 flex flex-col gap-1">
+              <span className="text-gray-500">Active Jobs</span>
+              <span className="text-2xl font-bold text-indigo-600">
+                {stats.activeJobs}
+              </span>
+              <span className="text-xs text-gray-500">
+                Currently open or in-progress jobs
+              </span>
+            </div>
+          </div>
+        </div>
+
 
         {/* MAIN WRAPPER */}
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -208,7 +297,7 @@ export default function ClientDashboard({ user }) {
                       {/* Budget */}
                       <div className="flex justify-between text-sm">
                         <div className="flex items-center gap-1.5 text-gray-600">
-                          <DollarSign size={14} />
+                          <IndianRupee size={14} />
                           Budget:
                         </div>
                         <span className="font-bold">{formatBudget(project)}</span>
@@ -296,7 +385,7 @@ export default function ClientDashboard({ user }) {
 
                       {/* Payment */}
                       <div className="flex justify-between text-sm">
-                        <div className="flex gap-1.5 items-center text-gray-600"><DollarSign size={14} /> Payment:</div>
+                        <div className="flex gap-1.5 items-center text-gray-600"><IndianRupee size={14} /> Payment:</div>
                         <span className="font-bold text-green-600">
                           {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
                             ? `₹${job.hourly_min}-${job.hourly_max}/hr`

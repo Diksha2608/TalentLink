@@ -1,7 +1,7 @@
 // frontend/src/pages/ProposalDetail.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, Calendar, MessageCircle, ArrowLeft, User, MapPin, Star, Briefcase, Award } from 'lucide-react';
+import { IndianRupee, Clock, Calendar, MessageCircle, ArrowLeft, User, MapPin, Star, Briefcase, Award } from 'lucide-react';
 import { proposalsAPI } from '../api/proposals';
 import { formatCurrency } from '../utils/currency';
 import { messagesAPI } from '../api/messages';
@@ -182,7 +182,7 @@ export default function ProposalDetail({ user }) {
             <div className="grid grid-cols-2 gap-6 mb-6 bg-purple-50 p-6 rounded-lg">
               <div>
                 <div className="flex items-center gap-2 text-gray-600 mb-2">
-                  <DollarSign size={20} />
+                  <IndianRupee size={20} />
                   <span className="text-sm font-medium">Bid Amount</span>
                 </div>
                 <div className="text-3xl font-bold text-purple-700">

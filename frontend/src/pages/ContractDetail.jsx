@@ -7,7 +7,7 @@ import {
   FileText,
   User,
   Calendar,
-  DollarSign,
+  IndianRupee,
   ArrowLeft
 } from 'lucide-react';
 import { contractsAPI } from '../api/contracts';
@@ -234,7 +234,7 @@ export default function ContractDetail({ user }) {
           {contract.payment_terms && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <DollarSign size={20} />
+                <IndianRupee size={20} />
                 Payment Terms
               </h3>
               <div className="bg-gray-50 rounded-lg p-4">

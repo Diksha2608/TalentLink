@@ -65,12 +65,31 @@ class SkillSerializer(serializers.ModelSerializer):
         model = Skill
         fields = ['id', 'name', 'slug']
 
+class ClientProfileStatsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientProfile
+        fields = (
+            'company_name',
+            'is_verified',
+            'projects_posted',
+            'active_projects',
+            'completed_projects',
+            'jobs_posted',
+            'active_jobs',
+            'completed_jobs',
+        )
+
 class UserSerializer(serializers.ModelSerializer):
     profile_complete = serializers.SerializerMethodField()
+    client_profile = ClientProfileStatsSerializer(read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'first_name', 'last_name', 'role', 'avatar', 'bio', 'location', 'phone','birthdate', 'rating_avg', 'created_at', 'profile_complete']
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name', 'role',
+            'avatar', 'bio', 'location', 'phone', 'birthdate',
+            'rating_avg', 'created_at', 'profile_complete', 'client_profile',  
+        ]
         read_only_fields = ['id', 'created_at', 'rating_avg']
 
     def get_profile_complete(self, obj):
@@ -85,6 +104,7 @@ class UserSerializer(serializers.ModelSerializer):
             except:
                 return False
         return True
+
 
 class PortfolioFileSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
@@ -122,19 +142,62 @@ class FreelancerProfileSerializer(serializers.ModelSerializer):
             'category', 'custom_category', 'role_title', 'languages', 
             'experiences', 'education', 'portfolio_files'
         ]
+    # NOTE: read_only_fields kept same as before
         read_only_fields = ['created_at', 'total_earnings', 'projects_completed', 'portfolio_files']
 
+
 class ClientProfileMeSerializer(serializers.ModelSerializer):
+    """
+    Extended client profile serializer that also exposes and updates
+    basic User fields so the frontend can hit /profiles/client/me/
+    once and send everything.
+    """
+    # ---- User-related fields (from the linked User model) ----
+    first_name = serializers.CharField(
+        source='user.first_name', required=False, allow_blank=True
+    )
+    last_name = serializers.CharField(
+        source='user.last_name', required=False, allow_blank=True
+    )
+    email = serializers.EmailField(
+        source='user.email', read_only=True
+    )
+    avatar = serializers.ImageField(
+        source='user.avatar', required=False, allow_null=True
+    )
+    bio = serializers.CharField(
+        source='user.bio', required=False, allow_blank=True
+    )
+    location = serializers.CharField(
+        source='user.location', required=False, allow_blank=True
+    )
+    phone = serializers.CharField(
+        source='user.phone', required=False, allow_blank=True
+    )
+    birthdate = serializers.DateField(
+        source='user.birthdate', required=False, allow_null=True
+    )
+
+    # ---- Existing client-profile-specific bits ----
     id_document_url = serializers.SerializerMethodField()
 
     class Meta:
         model = ClientProfile
         fields = (
+            # user-level fields
+            "first_name", "last_name", "email", "avatar",
+            "bio", "location", "phone", "birthdate",
+            # client-profile fields
             "company_name", "company_website", "id_document",
             "id_document_url", "is_verified", "verification_submitted_at",
-            "projects_posted", "active_projects"
+            "projects_posted", "active_projects","completed_projects",
+            "jobs_posted", "active_jobs", "completed_jobs",
         )
-        read_only_fields = ("is_verified", "verification_submitted_at", "projects_posted", "active_projects")
+        read_only_fields = (
+            "email", "is_verified", "verification_submitted_at",
+            "projects_posted", "active_projects", "completed_projects",
+            "jobs_posted", "active_jobs", "completed_jobs",
+        )
 
     def get_id_document_url(self, obj):
         request = self.context.get('request')
@@ -143,13 +206,46 @@ class ClientProfileMeSerializer(serializers.ModelSerializer):
         return None
 
     def update(self, instance, validated_data):
-        # Only stamp when id_document is explicitly provided
+        """
+        Handle updates for both the related User object and the ClientProfile.
+        validated_data will look like:
+        {
+            'user': {
+                'first_name': '...',
+                'last_name': '...',
+                'avatar': <InMemoryUploadedFile or None>,
+                'bio': '...',
+                'location': '...',
+                'phone': '...',
+                'birthdate': date or None,
+            },
+            'company_name': '...',
+            'company_website': '...',
+            'id_document': <InMemoryUploadedFile or None>,
+            ...
+        }
+        """
+        # Extract nested user data if present
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+
+        # Apply user field updates
+        for attr, value in user_data.items():
+            setattr(user, attr, value)
+        user.save()
+
+        # Keep your existing ID document stamping logic
         if 'id_document' in validated_data and validated_data['id_document'] is not None:
             instance.verification_submitted_at = timezone.now()
             instance.is_verified = False  # stays pending until admin approves
+
+        # Let ModelSerializer handle the rest of ClientProfile fields
         return super().update(instance, validated_data)
 
+
+# Keep alias as before
 ClientProfileSerializer = ClientProfileMeSerializer
+
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8, style={'input_type': 'password'})

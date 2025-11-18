@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, DollarSign, FileText, TrendingUp, User, CheckCircle, AlertCircle, Edit, Edit2, Layers } from 'lucide-react';
+import { Briefcase, IndianRupee, FileText, TrendingUp, User, CheckCircle, AlertCircle, Edit, Edit2, Layers } from 'lucide-react';
 import { authAPI } from '../api/auth';
 import { jobApplicationsAPI } from '../api/jobApplications';
 
@@ -201,7 +201,7 @@ export default function FreelancerDashboard({ user }) {
           <DashboardCard 
             title="Earnings" 
             value={stats.earnings} 
-            icon={DollarSign} 
+            icon={IndianRupee} 
             color="green" 
             isCurrency 
           />

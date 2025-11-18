@@ -16,6 +16,7 @@ import {
 import { useState, useRef, useEffect } from 'react';
 import { notificationsAPI } from '../api/notifications'; // ⬅️ new
 import { messagesAPI } from '../api/messages';
+import { Star, Bookmark } from 'lucide-react';
 
 export default function Navbar({ user, setUser, loading }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -445,7 +446,7 @@ export default function Navbar({ user, setUser, loading }) {
                       </span>
                     </div>
 
-                    <Link
+<Link
                       to="/profile"
                       className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
                       onClick={() => setProfileDropdownOpen(false)}
@@ -453,6 +454,30 @@ export default function Navbar({ user, setUser, loading }) {
                       <User size={16} />
                       Profile
                     </Link>
+
+                    {/* Reviews & Ratings - Only for freelancers */}
+                    {isFreelancer && (
+                      <Link
+                        to="/reviews"
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <Star size={16} />
+                        Reviews & Ratings
+                      </Link>
+                    )}
+
+                    {/* Saved Items - Only for freelancers */}
+                    {isFreelancer && (
+                      <Link
+                        to="/saved"
+                        className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <Bookmark size={16} />
+                        Saved Items
+                      </Link>
+                    )}
 
                     <Link
                       to="/settings"
@@ -599,12 +624,33 @@ export default function Navbar({ user, setUser, loading }) {
                 {isClient && (
                 <Link to="/payments" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Payments</Link>
                 )}
-                <Link
+<Link
                   to="/profile"
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
                 >
                   Profile
                 </Link>
+                
+                {/* Mobile: Reviews & Ratings - Only for freelancers */}
+                {isFreelancer && (
+                  <Link
+                    to="/reviews"
+                    className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                  >
+                    Reviews & Ratings
+                  </Link>
+                )}
+                
+                {/* Mobile: Saved Items - Only for freelancers */}
+                {isFreelancer && (
+                  <Link
+                    to="/saved"
+                    className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                  >
+                    Saved Items
+                  </Link>
+                )}
+                
                 <Link
                   to="/notifications"
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"

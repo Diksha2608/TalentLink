@@ -25,9 +25,11 @@ class Project(models.Model):
     )
 
     HOURS_PER_WEEK_CHOICES = (
-        ('less_30', 'Less than 30 hrs/week'),
+        ('less_10', 'Less than 10 hrs/week'),
+        ('10_30', '10–30 hrs/week'),
         ('more_30', 'More than 30 hrs/week'),
     )
+
 
     JOB_TYPE_CHOICES = (
         ('hourly', 'Hourly'),
