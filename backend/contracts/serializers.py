@@ -15,11 +15,17 @@ class ContractSerializer(serializers.ModelSerializer):
     project_title = serializers.SerializerMethodField()
     client_name = serializers.SerializerMethodField()
     freelancer_name = serializers.SerializerMethodField()
+    has_client_reviewed = serializers.SerializerMethodField()
+    has_freelancer_reviewed = serializers.SerializerMethodField()
+    client_can_review = serializers.SerializerMethodField()
+    freelancer_can_review = serializers.SerializerMethodField()
 
     class Meta:
         model = Contract
         fields = [
             'id',
+            'client',
+            'freelancer',
             'proposal',
             'job_application',
             'job_title',
@@ -33,9 +39,13 @@ class ContractSerializer(serializers.ModelSerializer):
             'status',
             'terms',
             'payment_terms',
-            'created_at'
+            'created_at',
+            'has_client_reviewed',
+            'has_freelancer_reviewed',
+            'client_can_review',
+            'freelancer_can_review'
         ]
-        read_only_fields = ['created_at']
+        read_only_fields = ['client', 'freelancer', 'created_at']
 
     def get_job_title(self, obj):
         """Return job title if contract is from a job application"""
@@ -66,6 +76,44 @@ class ContractSerializer(serializers.ModelSerializer):
         except Exception:
             pass
         return None
+
+    def _has_user_reviewed(self, obj, user_id):
+        if not user_id:
+            return False
+
+        prefetched = getattr(obj, '_prefetched_objects_cache', {}).get('reviews')
+        if prefetched is not None:
+            return any(
+                review.review_type == 'platform' and review.reviewer_id == user_id
+                for review in prefetched
+            )
+
+        return obj.reviews.filter(
+            reviewer_id=user_id,
+            review_type='platform'
+        ).exists()
+
+    def get_has_client_reviewed(self, obj):
+        return self._has_user_reviewed(obj, obj.client_id)
+
+    def get_has_freelancer_reviewed(self, obj):
+        return self._has_user_reviewed(obj, obj.freelancer_id)
+
+    def get_client_can_review(self, obj):
+        return (
+            obj.status == 'completed'
+            and obj.client_id
+            and obj.freelancer_id
+            and not self.get_has_client_reviewed(obj)
+        )
+
+    def get_freelancer_can_review(self, obj):
+        return (
+            obj.status == 'completed'
+            and obj.client_id
+            and obj.freelancer_id
+            and not self.get_has_freelancer_reviewed(obj)
+        )
 
 
 # ============================================================
@@ -234,7 +282,8 @@ class PlatformReviewCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Create platform review"""
         request = self.context.get('request')
-        contract = validated_data['contract']
+        data = validated_data.copy()
+        contract = data.pop('contract')
         
         # Determine reviewee
         if request.user == contract.client:
@@ -248,7 +297,7 @@ class PlatformReviewCreateSerializer(serializers.ModelSerializer):
             reviewee=reviewee,
             review_type='platform',
             is_verified=True,  # Platform reviews are auto-verified
-            **validated_data
+            **data
         )
 
         return review

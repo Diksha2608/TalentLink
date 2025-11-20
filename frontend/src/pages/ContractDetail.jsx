@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   CheckCircle,
   Clock,
@@ -15,14 +15,29 @@ import { contractsAPI } from '../api/contracts';
 export default function ContractDetail({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [showReviewSuccess, setShowReviewSuccess] = useState(location.state?.reviewSubmitted || false);
 
   useEffect(() => {
     loadContract();
   }, [id]);
+
+  useEffect(() => {
+    if (location.state?.reviewSubmitted) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (showReviewSuccess) {
+      const timer = setTimeout(() => setShowReviewSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showReviewSuccess]);
 
   const loadContract = async () => {
     try {
@@ -103,6 +118,12 @@ export default function ContractDetail({ user }) {
       (user.role === 'freelancer' && !contract.freelancer_signed));
 
   const canComplete = contract.status === 'active' && user.role === 'client';
+  const canClientReview = user?.role === 'client' && contract.client_can_review && user.id === contract.client;
+  const canFreelancerReview =
+    user?.role === 'freelancer' && contract.freelancer_can_review && user.id === contract.freelancer;
+  const showReviewButton = canClientReview || canFreelancerReview;
+  const reviewButtonLabel =
+    user?.role === 'client' ? 'Review Freelancer' : user?.role === 'freelancer' ? 'Review Client' : 'Leave Review';
 
   // ✅ Unified title for both job and project contracts
   const title = contract.job_title || contract.project_title || `Contract #${contract.id}`;
@@ -121,6 +142,12 @@ export default function ContractDetail({ user }) {
 
         {/* Main Card */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-6">
+          {showReviewSuccess && (
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+              Review submitted successfully! You can see it under Reviews & Ratings.
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex justify-between items-start mb-6 pb-6 border-b">
             <div>
@@ -244,7 +271,8 @@ export default function ContractDetail({ user }) {
           )}
 
           {/* Actions */}
-          <div className="flex gap-4 pt-6 border-t">
+          <div className="flex flex-col gap-4 pt-6 border-t">
+            <div className="flex gap-4 flex-wrap">
             {canSign && (
               <button
                 onClick={handleSignContract}
@@ -271,6 +299,25 @@ export default function ContractDetail({ user }) {
               <div className="flex items-center gap-2 text-green-700">
                 <CheckCircle size={24} />
                 <span className="font-semibold">This contract has been completed</span>
+              </div>
+            )}
+          </div>
+
+            {showReviewButton && (
+              <Link
+                to={`/contracts/${contract.id}/review`}
+                className="inline-flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition w-full sm:w-auto text-center"
+              >
+                {reviewButtonLabel}
+              </Link>
+            )}
+
+            {contract.status === 'completed' && (
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">Client review:</span>{' '}
+                {contract.has_client_reviewed ? 'Submitted' : 'Pending'} •{' '}
+                <span className="font-medium">Freelancer review:</span>{' '}
+                {contract.has_freelancer_reviewed ? 'Submitted' : 'Pending'}
               </div>
             )}
           </div>

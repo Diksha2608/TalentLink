@@ -21,6 +21,7 @@ import PostProject from './pages/PostProject';
 import FreelancerProfile from './pages/FreelancerProfile';
 import ClientProfile from './pages/ClientProfile';
 import ContractDetail from './pages/ContractDetail';
+import ContractReview from './pages/ContractReview';
 import ProposalDetail from './pages/ProposalDetail';
 import Talent from './pages/Talent';
 import Jobs from './pages/Jobs';
@@ -134,6 +135,7 @@ function AppLayout({ user, setUser, loading }) {
 
           <Route path="/contracts" element={<Contracts user={user} />} />
           <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
+          <Route path="/contracts/:id/review" element={<ContractReview user={user} />} />
 
           <Route
             path="/dashboard/freelancer"

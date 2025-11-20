@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { Star, Send, X } from 'lucide-react';
 import client from '../api/client';
 
-export default function ReviewForm({ contract, onSuccess, onCancel }) {
+export default function ReviewForm({
+  contract,
+  onSuccess,
+  onCancel,
+  title = 'Leave a Review',
+  subtitle = '',
+  submitLabel = 'Submit Review'
+}) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState('');
@@ -40,7 +47,10 @@ export default function ReviewForm({ contract, onSuccess, onCancel }) {
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-gray-900">Leave a Review</h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+        </div>
         {onCancel && (
           <button
             onClick={onCancel}
@@ -137,7 +147,7 @@ export default function ReviewForm({ contract, onSuccess, onCancel }) {
             className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Send size={18} />
-            {loading ? 'Submitting...' : 'Submit Review'}
+            {loading ? 'Submitting...' : submitLabel}
           </button>
         </div>
       </form>

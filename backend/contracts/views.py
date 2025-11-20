@@ -32,6 +32,8 @@ class ContractViewSet(viewsets.ModelViewSet):
             'proposal', 'proposal__project',
             'job_application', 'job_application__job',
             'client', 'freelancer'
+        ).prefetch_related(
+            'reviews', 'reviews__reviewer'
         ).order_by('-created_at')
 
         print(f"[Contracts] User: {user.email}, Count: {queryset.count()}")

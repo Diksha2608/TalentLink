@@ -455,8 +455,8 @@ export default function Navbar({ user, setUser, loading }) {
                       Profile
                     </Link>
 
-                    {/* Reviews & Ratings - Only for freelancers */}
-                    {isFreelancer && (
+                    {/* Reviews & Ratings */}
+                    {user && (
                       <Link
                         to="/reviews"
                         className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
@@ -631,8 +631,8 @@ export default function Navbar({ user, setUser, loading }) {
                   Profile
                 </Link>
                 
-                {/* Mobile: Reviews & Ratings - Only for freelancers */}
-                {isFreelancer && (
+                {/* Mobile: Reviews & Ratings */}
+                {user && (
                   <Link
                     to="/reviews"
                     className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"

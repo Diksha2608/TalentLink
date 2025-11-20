@@ -22,7 +22,11 @@ export default function ReviewsPage({ user }) {
             <Star className="text-purple-600" />
             My Reviews & Ratings
           </h1>
-          <p className="text-gray-600">View and respond to client feedback</p>
+          <p className="text-gray-600">
+            {user.role === 'client'
+              ? 'View what freelancers say about working with you'
+              : 'View and respond to client feedback'}
+          </p>
         </div>
 
         {/* Your existing ReviewList component handles everything */}
