@@ -31,6 +31,8 @@ import Payments from './pages/Payments';
 import Invoices from './pages/Invoices';
 import PostJob from './pages/PostJob';
 import JobDetail from './pages/JobDetail';
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import ForgotPasswordPage from "./pages/ForgotpasswordPage";
 
 import './App.css';
 
@@ -93,6 +95,9 @@ function AppLayout({ user, setUser, loading }) {
           <Route path="/" element={<Landing user={user} />} />
           <Route path="/signup" element={<SignUp setUser={setUser} />} />
           <Route path="/signin" element={<SignIn setUser={setUser} />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          
 
           <Route
             path="/onboarding"

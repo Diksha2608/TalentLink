@@ -6,8 +6,26 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 from django.db.models import Q, Count
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import FreelancerProfile, Skill, ClientProfile, PortfolioFile
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.core.mail import send_mail
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from projects.models import Project
+from proposals.models import Proposal
+from contracts.models import Contract, Review
+from jobs.models import Job, JobAttachment, JobApplication, JobApplicationAttachment
+from messaging.models import Message
+
+
+
+
+token_generator = PasswordResetTokenGenerator()
+
+
+
 from .serializers import (
     UserSerializer, FreelancerProfileSerializer, UserRegistrationSerializer, 
     SkillSerializer, EmailTokenObtainSerializer, ClientProfileSerializer, PortfolioFileSerializer
@@ -21,9 +39,16 @@ class EmailTokenObtainPairView(TokenObtainPairView):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]
-   
     parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    # DEFAULT = Auth required
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """Allow public access for register, forgot_password, reset_password"""
+        if self.action in ['register', 'forgot_password', 'reset_password']:
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register(self, request):
@@ -40,7 +65,7 @@ class UserViewSet(viewsets.ModelViewSet):
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
-    
+
     @action(detail=False, methods=['put', 'patch'])
     def update_me(self, request):
         user = request.user
@@ -50,17 +75,157 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['post'])
     def upload_resume(self, request):
         try:
             profile = request.user.freelancer_profile
             if 'resume' in request.FILES:
                 profile.resume_file = request.FILES['resume']
                 profile.save()
-                return Response({'detail': 'Resume uploaded successfully.'}, status=status.HTTP_200_OK)
+                return Response({'detail': 'Resume uploaded successfully.'}, status=200)
         except FreelancerProfile.DoesNotExist:
-            return Response({'detail': 'Freelancer profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-        return Response({'detail': 'No resume file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Freelancer profile not found.'}, status=404)
+
+        return Response({'detail': 'No resume file provided.'}, status=400)
+
+    # ----------------------
+    # FORGOT PASSWORD
+    # ----------------------
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[AllowAny],
+        url_path='forgot-password'
+    )
+    def forgot_password(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "Email is required"}, status=400)
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "No user found with this email"}, status=404)
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = token_generator.make_token(user)
+        reset_link = f"http://localhost:5173/reset-password?uid={uid}&token={token}"
+
+        send_mail(
+            subject="Reset your TalentLink password",
+            message=f"Click this link to reset your password: {reset_link}",
+            from_email="noreply@talentlink.com",
+            recipient_list=[email],
+            fail_silently=True,
+        )
+
+        return Response({"message": "Password reset link sent"})
+
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[AllowAny],
+        url_path='reset-password'
+    )
+    def reset_password(self, request):
+        uid = request.data.get("uid")
+        token = request.data.get("token")
+        new_password = request.data.get("new_password")
+
+        if not new_password:
+            return Response({"error": "New password is required"}, status=400)
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except:
+            return Response({"error": "Invalid UID"}, status=400)
+
+        # No token validation for your flow
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password reset successful"}, status=200)
+
+    # ----------------------
+    # DELETE ACCOUNT
+    # ----------------------
+
+    @action(
+        detail=False,
+        methods=['delete'],
+        permission_classes=[IsAuthenticated],
+        url_path='delete-account'
+    )
+    def delete_account(self, request):
+        user = request.user
+
+        with transaction.atomic():
+        # ----------------------
+        # Freelancer profile and portfolio files
+        # ----------------------
+            if hasattr(user, 'freelancer_profile'):
+                profile = user.freelancer_profile
+                profile.portfolio_files.all().delete()
+                profile.delete()
+
+            # ----------------------
+            # Client profile
+            # ----------------------
+            if hasattr(user, 'client_profile'):
+                user.client_profile.delete()
+
+            # ----------------------
+            # Projects (if client)
+            # ----------------------
+            Project.objects.filter(client=user).delete()
+
+        # ----------------------
+        # Proposals
+        # ----------------------
+            Proposal.objects.filter(freelancer=user).delete()
+
+        # ----------------------
+        # Contracts and reviews
+        # ----------------------
+            Contract.objects.filter(proposal__freelancer=user).delete()
+            Review.objects.filter(reviewer=user).delete()
+            Review.objects.filter(reviewee=user).delete()
+
+        # ----------------------
+        # Jobs posted (client) and applications (freelancer)
+        # ----------------------
+            JobAttachment.objects.filter(job__client=user).delete()
+            Job.objects.filter(client=user).delete()
+
+            JobApplicationAttachment.objects.filter(application__freelancer=user).delete()
+            JobApplication.objects.filter(freelancer=user).delete()
+
+        # ----------------------
+        # Messages and Conversations
+        # ----------------------
+            Message.objects.filter(sender=user).delete()
+            Message.objects.filter(recipient=user).delete()
+        # Delete conversations with only this user
+            for convo in user.conversations.all():
+                if convo.participants.count() <= 1:
+                    convo.delete()
+
+        # ----------------------
+        # Notifications
+        # ----------------------
+            user.notifications.all().delete()
+
+        # ----------------------
+        # Finally delete the user
+        # ----------------------
+            user.delete()
+
+        return Response(
+            {"message": "Your account and all associated data have been deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+
+
 
 class FreelancerProfileViewSet(viewsets.ModelViewSet):
     queryset = FreelancerProfile.objects.all()

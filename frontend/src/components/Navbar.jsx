@@ -1,6 +1,5 @@
 // frontend/src/components/Navbar.jsx
-
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
@@ -11,19 +10,18 @@ import {
   Settings,
   LogOut,
   Trash2,
-  IndianRupee
-} from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
-import { notificationsAPI } from '../api/notifications'; // ⬅️ new
-import { messagesAPI } from '../api/messages';
+  IndianRupee,
+} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { notificationsAPI } from "../api/notifications";
+import { messagesAPI } from "../api/messages";
+import { authAPI } from "../api/auth";
 
 export default function Navbar({ user, setUser, loading }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Search dropdown state 
+  // Dropdown state
   const [searchOpen, setSearchOpen] = useState(false);
-
-  // Profile / notifications / finances
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [financeDropdownOpen, setFinanceDropdownOpen] = useState(false);
@@ -40,12 +38,16 @@ export default function Navbar({ user, setUser, loading }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setProfileDropdownOpen(false);
       }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target)
+      ) {
         setNotificationsOpen(false);
       }
       if (financeRef.current && !financeRef.current.contains(event.target)) {
@@ -56,24 +58,25 @@ export default function Navbar({ user, setUser, loading }) {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
     setUser(null);
-    navigate('/');
+    navigate("/");
   };
-  const isFreelancer = !!user && user.role === 'freelancer';
-  const isClient =     !!user && user.role === 'client';
-  // Quick “Search for…” options
+
+  const isFreelancer = !!user && user.role === "freelancer";
+  const isClient = !!user && user.role === "client";
+
   const searchOptions = [
-    { value: 'projects', label: 'Projects', path: '/projects' },
-    { value: 'jobs', label: 'Jobs', path: '/jobs' },
-    { value: 'clients', label: 'Clients', path: '/clients' },
+    { value: "projects", label: "Projects", path: "/projects" },
+    { value: "jobs", label: "Jobs", path: "/jobs" },
+    { value: "clients", label: "Clients", path: "/clients" },
   ];
 
   const handleQuickSearchNavigate = (value) => {
@@ -81,30 +84,59 @@ export default function Navbar({ user, setUser, loading }) {
     if (opt) navigate(opt.path);
   };
 
-  // Notifications: load + poll
+  // Helper: parse notifications from paginated or non-paginated shapes
+  const normalizeList = (data) => {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return [];
+  };
+
+  // Poll notifications only when authenticated and tab visible
   useEffect(() => {
-    if (!user) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
-    }
+    let intervalId;
+    let running = false;
+
+    const canFetch = () =>
+      !!user &&
+      typeof document !== "undefined" &&
+      document.visibilityState === "visible";
 
     const fetchNotifications = async () => {
+      if (!canFetch() || running) return;
+      running = true;
       try {
-        const res = await notificationsAPI.list();
-        const data = Array.isArray(res.data)
-          ? res.data
-          : res.data?.results || [];
+        const res = await notificationsAPI.list({ page_size: 20 }); // server paginates
+        const data = normalizeList(res.data);
         setNotifications(data);
         setUnreadCount(data.filter((n) => !n.is_read).length);
       } catch (err) {
-        console.error('Failed to load notifications:', err);
+        // Log but don’t spam; keep prior state
+        // Optionally could implement exponential backoff if repeated failures
+        // console.error('Failed to load notifications:', err);
+      } finally {
+        running = false;
       }
     };
 
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5000);
-    return () => clearInterval(interval);
+    // Initial fetch
+    if (user) {
+      fetchNotifications();
+      // Poll every 30s (was 5s); reduce load and 401 flood risk
+      intervalId = setInterval(fetchNotifications, 30000);
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchNotifications();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [user]);
 
   const handleMarkAllRead = async () => {
@@ -113,7 +145,7 @@ export default function Navbar({ user, setUser, loading }) {
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (err) {
-      console.error('Failed to mark all read:', err);
+      // console.error('Failed to mark all read:', err);
     }
   };
 
@@ -122,61 +154,42 @@ export default function Navbar({ user, setUser, loading }) {
       if (!notif.is_read) {
         await notificationsAPI.markRead(notif.id);
         setNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notif.id ? { ...n, is_read: true } : n
-          )
+          prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n))
         );
         setUnreadCount((c) => Math.max(0, c - 1));
       }
     } catch (err) {
-      console.error('Failed to mark notification read:', err);
+      // console.error('Failed to mark notification read:', err);
     }
 
     const meta = notif.metadata || {};
 
-    // MESSAGE
-    if (notif.type === 'message') {
-      // We set this in signals.py
+    if (notif.type === "message") {
       if (meta.conversation_user_id) {
         navigate(`/messages?user=${meta.conversation_user_id}`);
       } else {
-        navigate('/messages');
+        navigate("/messages");
       }
-    }
-
-    // PROPOSAL
-    else if (notif.type === 'proposal') {
+    } else if (notif.type === "proposal") {
       if (meta.proposal_id) {
-        // Direct to specific proposal 
         navigate(`/proposals/${meta.proposal_id}`);
       } else if (meta.project_id) {
-        // Fallback: go to that project's page / proposals list
         navigate(`/projects/${meta.project_id}`);
       } else {
-        navigate('/proposals'); 
+        navigate("/proposals");
       }
-    }
-
-    // CONTRACT
-    else if (notif.type === 'contract') {
+    } else if (notif.type === "contract") {
       if (meta.contract_id) {
-        // If you add a detail page:
         navigate(`/contracts/${meta.contract_id}`);
-        // If you *only* have a contracts list:
-        // navigate(`/contracts?contract=${meta.contract_id}`);
       } else {
-        navigate('/contracts');
+        navigate("/contracts");
       }
-    }
-
-    // SYSTEM / ANYTHING ELSE
-    else {
-      navigate('/notifications');
+    } else {
+      navigate("/notifications");
     }
 
     setNotificationsOpen(false);
   };
-
 
   if (loading) {
     return (
@@ -206,11 +219,15 @@ export default function Navbar({ user, setUser, loading }) {
             {user && (
               <div className="hidden lg:flex items-center gap-5">
                 <Link
-                  to={user.role === 'client' ? '/dashboard/client' : '/dashboard/freelancer'}
+                  to={
+                    user.role === "client"
+                      ? "/dashboard/client"
+                      : "/dashboard/freelancer"
+                  }
                   className={`text-sm font-medium transition no-underline ${
-                    location.pathname.includes('dashboard')
-                      ? 'text-purple-600'
-                      : 'text-gray-700 hover:text-purple-600'
+                    location.pathname.includes("dashboard")
+                      ? "text-purple-600"
+                      : "text-gray-700 hover:text-purple-600"
                   }`}
                 >
                   Dashboard
@@ -218,9 +235,9 @@ export default function Navbar({ user, setUser, loading }) {
                 <Link
                   to="/messages"
                   className={`text-sm font-medium transition no-underline ${
-                    location.pathname === '/messages'
-                      ? 'text-purple-600'
-                      : 'text-gray-700 hover:text-purple-600'
+                    location.pathname === "/messages"
+                      ? "text-purple-600"
+                      : "text-gray-700 hover:text-purple-600"
                   }`}
                 >
                   Messages
@@ -228,104 +245,119 @@ export default function Navbar({ user, setUser, loading }) {
                 <Link
                   to="/contracts"
                   className={`text-sm font-medium transition no-underline ${
-                    location.pathname.includes('contracts')
-                      ? 'text-purple-600'
-                      : 'text-gray-700 hover:text-purple-600'
+                    location.pathname.includes("contracts")
+                      ? "text-purple-600"
+                      : "text-gray-700 hover:text-purple-600"
                   }`}
                 >
                   Contracts
                 </Link>
 
-                {/* Manage Finances */}
-                {/* Finance / Payments */}
-              {isFreelancer && (
-                <div className="relative" ref={financeRef}>
-                  <button
-                    onClick={() => setFinanceDropdownOpen(!financeDropdownOpen)}
-                    className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-purple-600 transition"
+                {/* Finance */}
+                {isFreelancer && (
+                  <div className="relative" ref={financeRef}>
+                    <button
+                      onClick={() =>
+                        setFinanceDropdownOpen(!financeDropdownOpen)
+                      }
+                      className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-purple-600 transition"
+                    >
+                      <IndianRupee size={16} />
+                      Manage Finances
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform ${
+                          financeDropdownOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+
+                    {financeDropdownOpen && (
+                      <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                        <Link
+                          to="/earnings"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                          onClick={() => setFinanceDropdownOpen(false)}
+                        >
+                          View Earnings
+                        </Link>
+                        <Link
+                          to="/payments"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                          onClick={() => setFinanceDropdownOpen(false)}
+                        >
+                          Payment Methods
+                        </Link>
+                        <Link
+                          to="/invoices"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                          onClick={() => setFinanceDropdownOpen(false)}
+                        >
+                          Invoices
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {isClient && (
+                  <Link
+                    to="/payments"
+                    className="hidden lg:flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-purple-600 transition no-underline"
+                    title="Payments you've made"
                   >
                     <IndianRupee size={16} />
-                    Manage Finances
-                    <ChevronDown
-                      size={14}
-                      className={`transition-transform ${financeDropdownOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {financeDropdownOpen && (
-                    <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-                      <Link to="/earnings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
-                        onClick={() => setFinanceDropdownOpen(false)}>
-                        View Earnings
-                      </Link>
-                      <Link to="/payments" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
-                        onClick={() => setFinanceDropdownOpen(false)}>
-                        Payment Methods
-                      </Link>
-                      <Link to="/invoices" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
-                        onClick={() => setFinanceDropdownOpen(false)}>
-                        Invoices
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isClient && (
-                <Link
-                  to="/payments"
-                  className="hidden lg:flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-purple-600 transition no-underline"
-                  title="Payments you've made"
-                >
-                  <IndianRupee size={16} />
-                  Payments
-                </Link>
-              )}
-
+                    Payments
+                  </Link>
+                )}
               </div>
             )}
           </div>
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {/* "Search for..." dropdown (no text input) */}
+            {/* Quick Search */}
             {isFreelancer && (
-            <div className="hidden md:flex items-center relative" ref={searchRef}>
-              <button
-                type="button"
-                onClick={() => setSearchOpen(!searchOpen)}
-                className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+              <div
+                className="hidden md:flex items-center relative"
+                ref={searchRef}
               >
-                <Search size={16} className="text-gray-400" />
-                <span>Search for...</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${searchOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-              {searchOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[9999]">
-                  {searchOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        handleQuickSearchNavigate(opt.value);
-                        setSearchOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(!searchOpen)}
+                  className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Search size={16} className="text-gray-400" />
+                  <span>Search for...</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform ${
+                      searchOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+                {searchOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[9999]">
+                    {searchOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          handleQuickSearchNavigate(opt.value);
+                          setSearchOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Client quick talent CTA stays */}
-            {user && user.role === 'client' && (
+            {/* Client CTA */}
+            {user && user.role === "client" && (
               <Link
                 to="/talent"
                 className="hidden md:flex items-center gap-2 px-4 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium text-sm no-underline"
@@ -371,7 +403,7 @@ export default function Navbar({ user, setUser, loading }) {
                             key={notif.id}
                             onClick={() => handleNotificationClick(notif)}
                             className={`p-3 hover:bg-gray-50 cursor-pointer transition ${
-                              !notif.is_read ? 'bg-purple-50' : ''
+                              !notif.is_read ? "bg-purple-50" : ""
                             }`}
                           >
                             <p className="text-sm text-gray-900 font-medium">
@@ -383,9 +415,7 @@ export default function Navbar({ user, setUser, loading }) {
                               </p>
                             )}
                             <p className="text-xs text-gray-500 mt-1">
-                              {new Date(
-                                notif.created_at
-                              ).toLocaleString()}
+                              {new Date(notif.created_at).toLocaleString()}
                             </p>
                           </div>
                         ))
@@ -439,9 +469,7 @@ export default function Navbar({ user, setUser, loading }) {
                       </p>
                       <p className="text-xs text-gray-500">{user.email}</p>
                       <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                        {user.role === 'freelancer'
-                          ? 'Freelancer'
-                          : 'Client'}
+                        {user.role === "freelancer" ? "Freelancer" : "Client"}
                       </span>
                     </div>
 
@@ -476,23 +504,39 @@ export default function Navbar({ user, setUser, loading }) {
                       Logout
                     </button>
 
-                    <button
-                      onClick={() => {
-                        if (
-                          confirm(
-                            'Are you sure you want to delete your account? This action cannot be undone.'
-                          )
-                        ) {
-                          alert(
-                            'Account deletion functionality to be implemented'
+                    <div className="m-3 p-4 border border-red-200 rounded-lg bg-red-50 shadow-sm">
+                      <h4 className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                        <Trash2 size={16} /> Delete Account
+                      </h4>
+                      <p className="text-xs text-red-600 mt-1">
+                        This action is irreversible. All your data will be
+                        permanently deleted.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          const sure = confirm(
+                            "Are you sure you want to delete your account? This action cannot be undone."
                           );
-                        }
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 size={16} />
-                      Delete Account
-                    </button>
+                          if (!sure) return;
+                          try {
+                            await authAPI.deleteAccount();
+                            alert(
+                              "Your account has been deleted successfully."
+                            );
+                            authAPI.logout();
+                          } catch (error) {
+                            console.error(error);
+                            alert(
+                              error.message ||
+                                "Something went wrong while deleting your account."
+                            );
+                          }
+                        }}
+                        className="mt-3 w-full bg-red-600 hover:bg-red-700 text-white font-medium text-sm py-2 rounded-lg transition"
+                      >
+                        Confirm Delete
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -519,7 +563,7 @@ export default function Navbar({ user, setUser, loading }) {
               </div>
             )}
 
-            {/* Mobile menu */}
+            {/* Mobile menu toggle */}
             <button
               className="md:hidden"
               onClick={() => setMenuOpen(!menuOpen)}
@@ -529,12 +573,11 @@ export default function Navbar({ user, setUser, loading }) {
           </div>
         </div>
 
-        {/* Mobile menu content */}
+        {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden bg-gray-50 border-top p-4 space-y-3 mt-3">
             {user ? (
               <>
-                {/* Mobile quick search dropdown */}
                 <div className="mb-2">
                   <label className="block text-xs text-gray-600 mb-1">
                     Search for...
@@ -543,7 +586,7 @@ export default function Navbar({ user, setUser, loading }) {
                     onChange={(e) => {
                       if (e.target.value) {
                         handleQuickSearchNavigate(e.target.value);
-                        e.target.value = '';
+                        e.target.value = "";
                       }
                     }}
                     className="w-full p-2 border border-gray-300 rounded-lg text-sm"
@@ -557,7 +600,7 @@ export default function Navbar({ user, setUser, loading }) {
                   </select>
                 </div>
 
-                {user.role === 'client' && (
+                {user.role === "client" && (
                   <Link
                     to="/talent"
                     className="flex items-center gap-2 py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
@@ -569,9 +612,9 @@ export default function Navbar({ user, setUser, loading }) {
 
                 <Link
                   to={
-                    user.role === 'client'
-                      ? '/dashboard/client'
-                      : '/dashboard/freelancer'
+                    user.role === "client"
+                      ? "/dashboard/client"
+                      : "/dashboard/freelancer"
                   }
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
                 >
@@ -589,16 +632,38 @@ export default function Navbar({ user, setUser, loading }) {
                 >
                   Contracts
                 </Link>
+
                 {isFreelancer && (
-                <>
-                <Link to="/earnings" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Earnings</Link>
-                <Link to="/payments" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Payment Methods</Link>
-                <Link to="/invoices" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Invoices</Link>
-                </>
+                  <>
+                    <Link
+                      to="/earnings"
+                      className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                    >
+                      Earnings
+                    </Link>
+                    <Link
+                      to="/payments"
+                      className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                    >
+                      Payment Methods
+                    </Link>
+                    <Link
+                      to="/invoices"
+                      className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                    >
+                      Invoices
+                    </Link>
+                  </>
                 )}
                 {isClient && (
-                <Link to="/payments" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Payments</Link>
+                  <Link
+                    to="/payments"
+                    className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                  >
+                    Payments
+                  </Link>
                 )}
+
                 <Link
                   to="/profile"
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"

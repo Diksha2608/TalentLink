@@ -17,65 +17,51 @@ export default function SignIn({ setUser }) {
     setLoading(true);
 
     try {
-      console.log('=== LOGIN ATTEMPT ===');
-      console.log('Email:', formData.email);
-
       setDebugInfo('Attempting login...');
+      // authAPI.login stores tokens and returns { access, refresh } or throws
+      const tokenPair = await authAPI.login(formData.email, formData.password);
+      console.log('Login token pair:', tokenPair);
 
-      const response = await authAPI.login(formData.email, formData.password);
-      console.log('Login response:', response);
-
-      setDebugInfo('Login successful, storing tokens...');
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
-
-      setDebugInfo('Fetching user data...');
+      setDebugInfo('Fetching user...');
       const userResponse = await authAPI.me();
-      console.log('User data:', userResponse.data);
+      const user = userResponse?.data;
+      console.log('User data:', user);
 
-      setUser(userResponse.data);
+      if (!user) {
+        throw new Error('Failed to load user profile');
+      }
+
+      setUser(user);
       setDebugInfo('Redirecting...');
 
-      if (userResponse.data.role === 'freelancer') {
-          navigate('/dashboard/freelancer');
-        }
-     else {
+      if (user?.role === 'freelancer') {
+        navigate('/dashboard/freelancer');
+      } else {
         navigate('/dashboard/client');
       }
     } catch (err) {
-      console.error('=== LOGIN ERROR ===');
-      console.error('Full error:', err);
-      console.error('Error response:', err.response);
-
-      let errorMsg = 'Login failed. ';
+      console.error('=== LOGIN ERROR ===', err);
+      let errorMsg = err?.message || 'Login failed';
       let debugMsg = '';
 
-      if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+
+      if (err?.message === 'Network Error' || err?.code === 'ERR_NETWORK') {
         errorMsg = 'Cannot connect to server. Is the backend running on http://127.0.0.1:8000?';
         debugMsg = 'Network error - backend might be down';
-      } else if (err.response) {
-        const status = err.response.status;
-        const data = err.response.data;
-
+      } else if (status) {
         debugMsg = `Status: ${status}, Data: ${JSON.stringify(data)}`;
-
         if (status === 401 || status === 400) {
-          if (typeof data.detail === 'string') {
-            errorMsg = data.detail;
-          } else if (Array.isArray(data.detail)) {
-            errorMsg = data.detail[0];
-          } else if (data.detail) {
-            errorMsg = JSON.stringify(data.detail);
-          } else {
-            errorMsg = 'Invalid email or password.';
-          }
+          if (typeof data?.detail === 'string') errorMsg = data.detail;
+          else if (Array.isArray(data?.detail)) errorMsg = data.detail[0];
+          else if (data?.detail) errorMsg = JSON.stringify(data.detail);
+          else errorMsg = 'Invalid email or password.';
         } else if (status === 500) {
           errorMsg = 'Server error. Please try again later.';
         } else {
-          errorMsg = `Error ${status}: ${err.response.statusText}`;
+          errorMsg = `Error ${status}: ${err?.response?.statusText || 'Request failed'}`;
         }
-      } else {
-        errorMsg = err.message || 'Unknown error occurred';
       }
 
       setError(errorMsg);
@@ -98,22 +84,25 @@ export default function SignIn({ setUser }) {
 
         <form onSubmit={handleSubmit} className="bg-white shadow-xl rounded-lg p-8 space-y-6">
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded">
+            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded" role="alert">
               <p className="font-medium">Login Failed</p>
               <p className="text-sm">{error}</p>
             </div>
           )}
 
           {debugInfo && !error && (
-            <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 px-4 py-3 rounded">
+            <div className="bg-blue-50 border-l-4 border-blue-500 text-blue-700 px-4 py-3 rounded" role="status">
               <p className="text-sm">{debugInfo}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              Email
+            </label>
             <input
               type="email"
+              id="email"
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -124,9 +113,12 @@ export default function SignIn({ setUser }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              Password
+            </label>
             <div className="relative">
               <input
+                id="password"
                 type={showPwd ? 'text' : 'password'}
                 required
                 value={formData.password}
@@ -149,8 +141,13 @@ export default function SignIn({ setUser }) {
                 title={showPwd ? 'Hide password' : 'Show password'}
               >
                 {showPwd ? (
-                  // Eye-off icon
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -159,26 +156,31 @@ export default function SignIn({ setUser }) {
                     />
                   </svg>
                 ) : (
-                  // Eye icon
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="1.5"
                       d="M2.25 12s3.75-7.5 9.75-7.5 9.75 7.5 9.75 7.5-3.75 7.5-9.75 7.5S2.25 12 2.25 12z"
                     />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.5"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 )}
               </button>
             </div>
             <p id="signin-password-help" className="sr-only">
               Toggle to reveal or hide the password.
+            </p>
+            <p className="mt-4 text-center">
+              <Link to="/forgot-password" className="text-purple-600 hover:underline">
+                Forgot Password?
+              </Link>
             </p>
           </div>
 

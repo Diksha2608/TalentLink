@@ -1,19 +1,25 @@
+# config/urls.py  (or your project-level urls.py)
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from users.views import UserViewSet, FreelancerProfileViewSet, SkillViewSet, EmailTokenObtainPairView
+# ViewSets
+from users.views import (
+    UserViewSet, FreelancerProfileViewSet, ClientProfileViewSet,
+    SkillViewSet, EmailTokenObtainPairView
+)
 from projects.views import ProjectViewSet
 from proposals.views import ProposalViewSet
 from contracts.views import ContractViewSet, ReviewViewSet
 from messaging.views import MessageViewSet
-from users.views import ClientProfileViewSet  
 from notifications.views import NotificationViewSet
-from jobs.views import JobViewSet, JobApplicationViewSet 
+from jobs.views import JobViewSet, JobApplicationViewSet
+
 
 def api_root(request):
     return JsonResponse({
@@ -39,19 +45,30 @@ router.register(r'contracts', ContractViewSet, basename='contract')
 router.register(r'reviews', ReviewViewSet, basename='review')
 router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'notifications', NotificationViewSet, basename='notification')
-router.register(r'job-applications', JobApplicationViewSet, basename='job-application') 
+router.register(r'job-applications', JobApplicationViewSet, basename='job-application')
 router.register(r'jobs', JobViewSet, basename='job')
 
 urlpatterns = [
     path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
+
+    # ViewSet routes under /api/
     path('api/', include(router.urls)),
+
+    # JWT obtain/refresh
     path('api/token/', EmailTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-     
-    path('api/messages/', include('messaging.urls')),  # ← Messages with custom URLs
+
+    # App-specific URL modules (if you have extra non-ViewSet routes)
+    path('api/messages/', include('messaging.urls')),
     path('api/jobs/', include('jobs.urls')),
-      
+
+    # Forgot Password
+path('api/users/forgot-password/', 
+     UserViewSet.as_view({'post': 'forgot_password'}), 
+     name='forgot-password'),
+    path('api/users/reset-password/', UserViewSet.as_view({'post': 'reset_password'}), name='reset-password'),
+
 ]
 
 if settings.DEBUG:

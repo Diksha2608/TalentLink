@@ -68,17 +68,14 @@ WSGI_APPLICATION = 'talentlink.wsgi.application'
 # ============= DATABASE =============
 import dj_database_url
 
-if config('DATABASE_URL', default=None):
-    DATABASES = {
-        'default': dj_database_url.config(default=config('DATABASE_URL'), conn_max_age=600)
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+DATABASES = {
+    'default': dj_database_url.config(
+        default=config('DATABASE_URL'),  # reads DATABASE_URL from .env
+        conn_max_age=600,                # optional: keeps DB connections open
+        ssl_require=False                 # set True if using SSL
+    )
+}
+
 
 # ============= AUTH & JWT =============
 AUTH_USER_MODEL = 'users.User'
@@ -105,6 +102,15 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ),
 }
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "talentlink58@gmail.com"
+EMAIL_HOST_PASSWORD = "qjyg zwhm lzvr ipnv"
+DEFAULT_FROM_EMAIL = "TalentLink <yourgmail@gmail.com>"
+
 
 # ============= JWT SETTINGS =============
 SIMPLE_JWT = {
