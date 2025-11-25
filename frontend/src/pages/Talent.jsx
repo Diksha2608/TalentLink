@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MapPin, Star, DollarSign, X, Award, TrendingUp } from 'lucide-react';
+import { Search, MapPin, Star, IndianRupee, X, Award, TrendingUp } from 'lucide-react';
 import FreelancerCard from '../components/FreelancerCard';
 import { freelancersAPI } from '../api/freelancers';
 
@@ -207,7 +207,7 @@ export default function Talent() {
               {/* Hourly Rate */}
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
-                  <DollarSign size={16} className="inline mr-1" />
+                  <IndianRupee size={16} className="inline mr-1" />
                   Hourly Rate (₹/hr)
                 </label>
                 <div className="flex gap-2">

@@ -9,6 +9,7 @@ import SignIn from './pages/SignIn';
 import OnboardingWizard from './pages/OnboardingWizard';
 import ProjectFeed from './pages/ProjectFeed';
 import ProjectDetail from './pages/ProjectDetail';
+import EditProject from './pages/EditProject';
 import ClientDashboard from './pages/ClientDashboard';
 import FreelancerDashboard from './pages/FreelancerDashboard';
 import Messages from './pages/Messages';
@@ -20,6 +21,7 @@ import PostProject from './pages/PostProject';
 import FreelancerProfile from './pages/FreelancerProfile';
 import ClientProfile from './pages/ClientProfile';
 import ContractDetail from './pages/ContractDetail';
+import ContractReview from './pages/ContractReview';
 import ProposalDetail from './pages/ProposalDetail';
 import Talent from './pages/Talent';
 import Jobs from './pages/Jobs';
@@ -110,6 +112,7 @@ function AppLayout({ user, setUser, loading }) {
 
           <Route path="/talent" element={<Talent user={user} />} />
           <Route path="/projects" element={<ProjectFeed user={user} />} />
+          <Route path="/projects/:id/edit" element={<EditProject user={user} />} />
           <Route path="/jobs" element={<Jobs user={user} />} />
           <Route path="/clients" element={<Clients user={user} />} />
 
@@ -133,6 +136,7 @@ function AppLayout({ user, setUser, loading }) {
 
           <Route path="/contracts" element={<Contracts user={user} />} />
           <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
+          <Route path="/contracts/:id/review" element={<ContractReview user={user} />} />
 
           <Route
             path="/dashboard/freelancer"
@@ -214,11 +218,13 @@ function AppLayout({ user, setUser, loading }) {
               </ProtectedRoute>
             }
           />
-
+          <Route path="/reviews" element={<ReviewsPage user={user} />} />
+          <Route path="/saved" element={<SavedItemsPage />} />
           <Route path="/test-api" element={<TestAPI />} />
           <Route path="/jobs/create" element={<PostJob user={user} />} />
           <Route path="/jobs/:id" element={<JobDetail user={user} />} />
-
+          <Route path="/jobs/:id/edit" element={<EditJob user={user} />} />  
+          <Route path="/submit-review" element={<ExternalReviewForm />} />
           <Route
             path="/projects/create"
             element={

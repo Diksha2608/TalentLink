@@ -1,31 +1,26 @@
-# backend/jobs/views.py
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from django.db.models import Q
 from datetime import datetime, timedelta
 
-from .models import Job
-from .serializers import JobSerializer
-
-from rest_framework.decorators import action
-from .models import JobApplication, JobApplicationAttachment
-from .serializers import JobApplicationSerializer
+from .models import Job, JobApplication, JobApplicationAttachment
+from .serializers import JobSerializer, JobApplicationSerializer
 
 
+# ============================================================
+# JOB VIEWSET
+# ============================================================
 class JobViewSet(viewsets.ModelViewSet):
     serializer_class = JobSerializer
-    permission_classes = [AllowAny]  # Allow anyone to view
+    permission_classes = [AllowAny]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
-
     queryset = Job.objects.all().select_related('client').prefetch_related('attachments')
 
     def get_permissions(self):
-        """
-        Allow unauthenticated users to list and retrieve jobs.
-        Require authentication for create, update, delete.
-        """
+        """Allow unauthenticated users to list/retrieve jobs, require auth for write actions."""
         if self.action in ['list', 'retrieve']:
             return [AllowAny()]
         return [IsAuthenticated()]
@@ -37,36 +32,21 @@ class JobViewSet(viewsets.ModelViewSet):
         qs = Job.objects.filter(visibility='public')
         params = self.request.query_params
 
-        print("\n" + "="*50)
-        print("JOBS FILTER REQUEST")
-        print("="*50)
-        print(f"Initial queryset count: {qs.count()}")
-        print(f"Params received: {dict(params)}")
-        print("-"*50)
-
-        # Status filter
+        # Filters
         status_param = params.get('status', '').strip()
         if status_param:
             qs = qs.filter(status=status_param)
-            print(f"✓ Status filter '{status_param}': {qs.count()} jobs")
 
-        # Job type filter
         job_types = params.get('job_type', '').strip()
         if job_types:
             job_type_list = [j.strip() for j in job_types.split(',') if j.strip()]
-            if job_type_list:
-                qs = qs.filter(job_type__in=job_type_list)
-                print(f"✓ Job type filter {job_type_list}: {qs.count()} jobs")
+            qs = qs.filter(job_type__in=job_type_list)
 
-        # Experience level filter
         experience = params.get('experience_level', '').strip()
         if experience:
             exp_list = [e.strip() for e in experience.split(',') if e.strip()]
-            if exp_list:
-                qs = qs.filter(experience_level__in=exp_list)
-                print(f"✓ Experience filter {exp_list}: {qs.count()} jobs")
+            qs = qs.filter(experience_level__in=exp_list)
 
-        # Posted time filter
         posted_time = params.get('posted_time', '').strip()
         if posted_time:
             now = datetime.now()
@@ -76,49 +56,26 @@ class JobViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(created_at__gte=now - timedelta(days=7))
             elif posted_time == 'month':
                 qs = qs.filter(created_at__gte=now - timedelta(days=30))
-            print(f"✓ Posted time filter '{posted_time}': {qs.count()} jobs")
 
-        # Hourly rate filter
         min_rate = params.get('hourly_min', '').strip()
         max_rate = params.get('hourly_max', '').strip()
         if min_rate:
-            try:
-                qs = qs.filter(hourly_min__gte=float(min_rate))
-                print(f"✓ Min hourly rate ≥ ₹{min_rate}: {qs.count()} jobs")
-            except ValueError:
-                print("⚠ Invalid min_rate value")
+            qs = qs.filter(hourly_min__gte=float(min_rate))
         if max_rate:
-            try:
-                qs = qs.filter(hourly_max__lte=float(max_rate))
-                print(f"✓ Max hourly rate ≤ ₹{max_rate}: {qs.count()} jobs")
-            except ValueError:
-                print("⚠ Invalid max_rate value")
+            qs = qs.filter(hourly_max__lte=float(max_rate))
 
-        # Location filter
         location = params.get('location', '').strip()
         if location:
             qs = qs.filter(location__icontains=location)
-            print(f"✓ Location filter '{location}': {qs.count()} jobs")
 
-        # Location type filter
         location_type = params.get('location_type', '').strip()
         if location_type:
             loc_list = [l.strip() for l in location_type.split(',') if l.strip()]
-            if loc_list:
-                qs = qs.filter(location_type__in=loc_list)
-                print(f"✓ Location type filter {loc_list}: {qs.count()} jobs")
+            qs = qs.filter(location_type__in=loc_list)
 
-        # Search filter
         search = params.get('search', '').strip()
         if search:
-            qs = qs.filter(
-                Q(title__icontains=search) | Q(description__icontains=search)
-            ).distinct()
-            print(f"✓ Search filter '{search}': {qs.count()} jobs")
-
-        print("-"*50)
-        print(f"FINAL RESULT: {qs.count()} jobs")
-        print("="*50 + "\n")
+            qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search)).distinct()
 
         return qs
 
@@ -129,6 +86,9 @@ class JobViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
+# ============================================================
+# JOB APPLICATION VIEWSET
+# ============================================================
 class JobApplicationViewSet(viewsets.ModelViewSet):
     serializer_class = JobApplicationSerializer
     permission_classes = [IsAuthenticated]
@@ -136,15 +96,16 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = JobApplication.objects.none()
 
         if getattr(user, 'role', None) == 'freelancer':
             queryset = JobApplication.objects.filter(freelancer=user)
         elif getattr(user, 'role', None) == 'client':
             queryset = JobApplication.objects.filter(job__client=user)
-        else:
-            queryset = JobApplication.objects.none()
 
-        print(f"[Job Applications] User: {getattr(user, 'email', 'unknown')}, Role: {getattr(user, 'role', 'unknown')}, Count: {queryset.count()}")
+        job_id = self.request.query_params.get('job', None)
+        if job_id:
+            queryset = queryset.filter(job_id=job_id)
 
         return queryset.select_related('job', 'freelancer').prefetch_related('attachments').order_by('-created_at')
 
@@ -155,40 +116,25 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         except Job.DoesNotExist:
             return Response({'detail': 'Job not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if job is still open
         if job.status != 'open':
-            return Response(
-                {'detail': 'This job is no longer accepting applications.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'detail': 'This job is no longer accepting applications.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if freelancer already submitted an application
-        existing_application = JobApplication.objects.filter(
-            job=job,
-            freelancer=request.user
-        ).first()
-
+        existing_application = JobApplication.objects.filter(job=job, freelancer=request.user).first()
         if existing_application:
-            return Response(
-                {'detail': 'You have already submitted an application for this job.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'detail': 'You have already submitted an application for this job.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create application
-        application_data = {
+        serializer = self.get_serializer(data={
             'job': job.id,
             'cover_letter': request.data.get('cover_letter'),
             'bid_amount': request.data.get('bid_amount'),
             'estimated_time': request.data.get('estimated_time'),
-        }
+        })
 
-        serializer = self.get_serializer(data=application_data)
         if serializer.is_valid():
             application = serializer.save(freelancer=request.user)
 
-            # Handle file attachments
             files = request.FILES.getlist('attachments')
-            for f in files[:3]:  # Max 3 files
+            for f in files[:3]:
                 JobApplicationAttachment.objects.create(
                     application=application,
                     file=f,
@@ -196,7 +142,6 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                     size=getattr(f, 'size', 0)
                 )
 
-            # Create notification for client
             try:
                 from notifications.models import Notification
                 Notification.objects.create(
@@ -204,66 +149,100 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                     type='job_application',
                     title='New Job Application',
                     message=f'{request.user.get_full_name()} applied for your job: {job.title}',
-                    metadata={
-                        'job_id': job.id,
-                        'application_id': application.id,
-                        'freelancer_id': request.user.id
-                    }
+                    metadata={'job_id': job.id, 'application_id': application.id}
                 )
             except Exception:
-                pass  # Skip if notifications app doesn't exist
+                pass
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    # ======================================
+    # ACCEPT APPLICATION
+    # ======================================
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
         application = self.get_object()
-        if application.job.client != request.user:
+        job = application.job
+
+        # Only client can accept
+        if job.client != request.user:
             return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Reject all other pending applications
-        JobApplication.objects.filter(
-            job=application.job,
-            status='pending'
-        ).exclude(id=application.id).update(status='rejected')
+        # Reject other pending applications
+        JobApplication.objects.filter(job=job, status='pending').exclude(id=application.id).update(status='rejected')
 
+        # Accept this application
         application.status = 'accepted'
         application.save()
 
-        # Create notification for freelancer
-        try:
-            from notifications.models import Notification
-            Notification.objects.create(
-                user=application.freelancer,
-                type='job_application',
-                title='Application Accepted',
-                message=f'Your application for "{application.job.title}" has been accepted!',
-                metadata={
-                    'job_id': application.job.id,
-                    'application_id': application.id,
-                    'client_id': request.user.id
-                }
-            )
-        except Exception:
-            pass
+        # Update job
+        job.status = 'in_progress'
+        job.save()
 
-        # Create contract
+        # Create Contract
         try:
             from contracts.models import Contract
-            Contract.objects.get_or_create(
-                job_application=application,
-                defaults={
-                    'terms': 'Job terms as discussed',
-                    'payment_terms': 'Payment on completion'
-                }
+
+            payment_terms = (
+                f"Hourly rate: ₹{job.hourly_min} - ₹{job.hourly_max}/hour"
+                if job.job_type == 'hourly'
+                else f"Fixed payment: ₹{job.fixed_amount or application.bid_amount}"
             )
-        except Exception:
-            pass  # Skip if contracts app doesn't exist or field not added yet
 
-        return Response({'detail': 'Application accepted. Contract created.'}, status=status.HTTP_200_OK)
+            terms = f"""
+            CONTRACT AGREEMENT
+            ------------------
+            Job Title: {job.title}
+            Description: {job.description}
+            Client: {job.client.get_full_name() or job.client.username}
+            Freelancer: {application.freelancer.get_full_name() or application.freelancer.username}
+            Cover Letter: {application.cover_letter or 'N/A'}
+            Bid Amount: ₹{application.bid_amount or 'N/A'}
+            Estimated Time: {application.estimated_time or 'N/A'}
+            """
 
+            contract = Contract.objects.create(
+                job_application=application,
+                client=job.client,
+                freelancer=application.freelancer,
+                terms=terms.strip(),
+                payment_terms=payment_terms,
+                status='pending',
+                client_signed=False,
+                freelancer_signed=False
+            )
+
+            # Notify freelancer
+            try:
+                from notifications.models import Notification
+                Notification.objects.create(
+                    user=application.freelancer,
+                    type='contract',
+                    title='Application Accepted ✅',
+                    message=f'Your application for "{job.title}" has been accepted. A contract has been created and awaits signing.',
+                    metadata={'contract_id': contract.id, 'job_id': job.id}
+                )
+            except Exception:
+                pass
+
+            return Response({
+                'detail': 'Application accepted. Contract created successfully.',
+                'application_id': application.id,
+                'contract_id': contract.id,
+                'job_status': job.status
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                'detail': 'Application accepted, but contract creation failed.',
+                'error': str(e)
+            }, status=status.HTTP_200_OK)
+
+    # ======================================
+    # REJECT APPLICATION
+    # ======================================
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         application = self.get_object()
@@ -273,7 +252,6 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
         application.status = 'rejected'
         application.save()
 
-        # Create notification for freelancer
         try:
             from notifications.models import Notification
             Notification.objects.create(
@@ -281,10 +259,7 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 type='job_application',
                 title='Application Rejected',
                 message=f'Your application for "{application.job.title}" was not accepted.',
-                metadata={
-                    'job_id': application.job.id,
-                    'application_id': application.id
-                }
+                metadata={'job_id': application.job.id, 'application_id': application.id}
             )
         except Exception:
             pass

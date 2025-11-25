@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Search, X, Clock, DollarSign, MapPin, Briefcase, Award, Calendar } from 'lucide-react';
 import { jobsAPI } from '../api/jobs'; 
-import { Link } from 'react-router-dom';
+import JobCard from '../components/JobCard';
+import { Search, X, IndianRupee, MapPin, Briefcase } from 'lucide-react';
 
 const JOB_TYPES = [
   { value: 'hourly', label: 'Hourly' },
@@ -26,7 +26,7 @@ const LOCATION_TYPE = [
   { value: 'onsite', label: 'Onsite' }
 ];
 
-export default function Jobs() {
+export default function Jobs({ user }) {
   const [jobs, setJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -88,28 +88,6 @@ export default function Jobs() {
         setJobs([]);
       })
       .finally(() => setLoading(false));
-  };
-
-  const formatJobType = (type) => {
-    return type === 'hourly' ? 'Hourly' : 'Fixed Price';
-  };
-
-  const formatExperience = (level) => {
-    const map = {
-      'entry': 'Entry Level',
-      'intermediate': 'Intermediate',
-      'expert': 'Expert'
-    };
-    return map[level] || level;
-  };
-
-  const formatLocationType = (type) => {
-    const map = {
-      'remote': 'Remote',
-      'hybrid': 'Hybrid',
-      'onsite': 'Onsite'
-    };
-    return map[type] || type;
   };
 
   return (
@@ -240,7 +218,7 @@ export default function Jobs() {
             {/* Hourly Rate */}
             <div className="mb-5">
               <div className="text-sm font-semibold text-gray-800 mb-3">
-                <DollarSign size={16} className="inline mr-1" />
+                <IndianRupee size={16} className="inline mr-1" />
                 Hourly Rate (₹/hr)
               </div>
               <div className="flex gap-2">
@@ -293,92 +271,15 @@ export default function Jobs() {
                 <div className="mb-4 text-sm text-gray-600">
                   <span className="font-semibold text-gray-900">{jobs.length}</span> job{jobs.length !== 1 ? 's' : ''} found
                 </div>
-                <div className="space-y-4">
+                {/* ✅ GRID LAYOUT - Same as ProjectFeed */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {jobs.map((job) => (
-                    <Link
-                      key={job.id}
-                      to={`/jobs/${job.id}`}
-                      className="block bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition no-underline border-2 border-transparent hover:border-purple-400"
-                    >
-                      {/* Header */}
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-bold text-gray-900 hover:text-purple-600 mb-2">
-                            {job.title}
-                          </h3>
-                          <div className="flex flex-wrap gap-2">
-                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full border border-green-200">
-                              Open
-                            </span>
-                            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full border border-blue-200 capitalize">
-                              {formatJobType(job.job_type)}
-                            </span>
-                            <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full border border-amber-200">
-                              {formatExperience(job.experience_level)}
-                            </span>
-                            {job.location_type && (
-                              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200 capitalize">
-                                {formatLocationType(job.location_type)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2 leading-relaxed">
-                        {job.description}
-                      </p>
-
-                      {/* Job Details Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        {/* Payment */}
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1 text-gray-600 mb-1">
-                            <DollarSign size={16} className="text-green-600" />
-                            <span className="text-xs font-medium">Payment</span>
-                          </div>
-                          <span className="text-base font-bold text-green-600">
-                            {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
-                              ? `₹${job.hourly_min}-${job.hourly_max}/hr`
-                              : job.job_type === 'fixed' && job.fixed_amount
-                              ? `₹${job.fixed_amount}`
-                              : 'Not specified'}
-                          </span>
-                        </div>
-
-                        {/* Location */}
-                        {job.location && (
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1 text-gray-600 mb-1">
-                              <MapPin size={16} />
-                              <span className="text-xs font-medium">Location</span>
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {job.location}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Posted Date */}
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1 text-gray-600 mb-1">
-                            <Calendar size={16} />
-                            <span className="text-xs font-medium">Posted</span>
-                          </div>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {new Date(job.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <p className="text-xs text-gray-500">
-                          Posted by: <span className="font-semibold text-gray-700">{job.client_name || 'Client'}</span>
-                        </p>
-                      </div>
-                    </Link>
+                    <JobCard 
+                      key={job.id} 
+                      job={job} 
+                      user={user}
+                      showSaveButton={true}
+                    />
                   ))}
                 </div>
               </>

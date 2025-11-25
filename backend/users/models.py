@@ -71,6 +71,7 @@ class PortfolioFile(models.Model):
     def __str__(self):
         return f"{self.freelancer_profile.user.username} - {self.file_name}"
 
+
 class ClientProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
     company_name = models.CharField(max_length=200, blank=True)
@@ -78,10 +79,15 @@ class ClientProfile(models.Model):
     id_document = models.FileField(upload_to='client_ids/', null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     verification_submitted_at = models.DateTimeField(null=True, blank=True)
+
+    # ✅ Project counters
     projects_posted = models.IntegerField(default=0)
     active_projects = models.IntegerField(default=0)
+    completed_projects = models.IntegerField(default=0)
+
+    # ✅ Job counters (NEW)
+    jobs_posted = models.IntegerField(default=0)
+    active_jobs = models.IntegerField(default=0)
+    completed_jobs = models.IntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.user.get_full_name()} - Client"
-

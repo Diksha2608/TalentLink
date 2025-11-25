@@ -1,19 +1,43 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { CheckCircle, Clock, AlertCircle, FileText, User, Calendar, DollarSign, ArrowLeft } from 'lucide-react';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
+import {
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  FileText,
+  User,
+  Calendar,
+  IndianRupee,
+  ArrowLeft
+} from 'lucide-react';
 import { contractsAPI } from '../api/contracts';
 
 export default function ContractDetail({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [showReviewSuccess, setShowReviewSuccess] = useState(location.state?.reviewSubmitted || false);
 
   useEffect(() => {
     loadContract();
   }, [id]);
+
+  useEffect(() => {
+    if (location.state?.reviewSubmitted) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (showReviewSuccess) {
+      const timer = setTimeout(() => setShowReviewSuccess(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showReviewSuccess]);
 
   const loadContract = async () => {
     try {
@@ -43,10 +67,8 @@ export default function ContractDetail({ user }) {
   };
 
   const handleCompleteContract = async () => {
-    if (!window.confirm('Are you sure you want to mark this contract as completed?')) {
-      return;
-    }
-    
+    if (!window.confirm('Are you sure you want to mark this contract as completed?')) return;
+
     try {
       setActionLoading(true);
       await contractsAPI.complete(id);
@@ -90,11 +112,21 @@ export default function ContractDetail({ user }) {
     );
   }
 
-  const canSign = contract.status === 'pending' &&
+  const canSign =
+    contract.status === 'pending' &&
     ((user.role === 'client' && !contract.client_signed) ||
-     (user.role === 'freelancer' && !contract.freelancer_signed));
+      (user.role === 'freelancer' && !contract.freelancer_signed));
 
   const canComplete = contract.status === 'active' && user.role === 'client';
+  const canClientReview = user?.role === 'client' && contract.client_can_review && user.id === contract.client;
+  const canFreelancerReview =
+    user?.role === 'freelancer' && contract.freelancer_can_review && user.id === contract.freelancer;
+  const showReviewButton = canClientReview || canFreelancerReview;
+  const reviewButtonLabel =
+    user?.role === 'client' ? 'Review Freelancer' : user?.role === 'freelancer' ? 'Review Client' : 'Leave Review';
+
+  // ✅ Unified title for both job and project contracts
+  const title = contract.job_title || contract.project_title || `Contract #${contract.id}`;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -110,10 +142,16 @@ export default function ContractDetail({ user }) {
 
         {/* Main Card */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-6">
+          {showReviewSuccess && (
+            <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+              Review submitted successfully! You can see it under Reviews & Ratings.
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex justify-between items-start mb-6 pb-6 border-b">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{contract.project_title}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{title}</h1>
               <p className="text-gray-600">Contract ID: #{contract.id}</p>
             </div>
             <span
@@ -223,7 +261,7 @@ export default function ContractDetail({ user }) {
           {contract.payment_terms && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <DollarSign size={20} />
+                <IndianRupee size={20} />
                 Payment Terms
               </h3>
               <div className="bg-gray-50 rounded-lg p-4">
@@ -233,7 +271,8 @@ export default function ContractDetail({ user }) {
           )}
 
           {/* Actions */}
-          <div className="flex gap-4 pt-6 border-t">
+          <div className="flex flex-col gap-4 pt-6 border-t">
+            <div className="flex gap-4 flex-wrap">
             {canSign && (
               <button
                 onClick={handleSignContract}
@@ -263,18 +302,46 @@ export default function ContractDetail({ user }) {
               </div>
             )}
           </div>
+
+            {showReviewButton && (
+              <Link
+                to={`/contracts/${contract.id}/review`}
+                className="inline-flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition w-full sm:w-auto text-center"
+              >
+                {reviewButtonLabel}
+              </Link>
+            )}
+
+            {contract.status === 'completed' && (
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">Client review:</span>{' '}
+                {contract.has_client_reviewed ? 'Submitted' : 'Pending'} •{' '}
+                <span className="font-medium">Freelancer review:</span>{' '}
+                {contract.has_freelancer_reviewed ? 'Submitted' : 'Pending'}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Related Project Link */}
-        {contract.proposal?.project && (
+        {/* Related Links */}
+        {(contract.proposal?.project || contract.job_application?.job) && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Related Project</h3>
-            <Link
-              to={`/projects/${contract.proposal.project}`}
-              className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
-            >
-              View Project Details →
-            </Link>
+            <h3 className="font-semibold text-gray-900 mb-3">Related Work</h3>
+            {contract.proposal?.project ? (
+              <Link
+                to={`/projects/${contract.proposal.project}`}
+                className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
+              >
+                View Project Details →
+              </Link>
+            ) : (
+              <Link
+                to={`/jobs/${contract.job_application.job}`}
+                className="text-purple-600 hover:text-purple-700 font-medium hover:underline"
+              >
+                View Job Details →
+              </Link>
+            )}
           </div>
         )}
       </div>

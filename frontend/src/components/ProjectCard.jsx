@@ -1,9 +1,52 @@
 // frontend/src/components/ProjectCard.jsx (REPLACE ENTIRE FILE)
 import { Link } from 'react-router-dom';
-import { Briefcase, Clock, Calendar, Users, DollarSign, MapPin, Award } from 'lucide-react';
+import { Briefcase, Clock, Calendar, Users, IndianRupee, MapPin, Award, Bookmark } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
+import { useState, useEffect } from 'react';
+import { savedItemsAPI } from '../api/savedItems';
 
-export default function ProjectCard({ project }) {
+export default function ProjectCard({ project, showSaveButton = true }) {
+  const [isSaved, setIsSaved] = useState(false);
+  const [savingInProgress, setSavingInProgress] = useState(false);
+
+  useEffect(() => {
+    if (showSaveButton) {
+      checkIfSaved();
+    }
+  }, [project.id, showSaveButton]);
+
+  const checkIfSaved = async () => {
+    try {
+      const res = await savedItemsAPI.isProjectSaved(project.id);
+      setIsSaved(res.data.is_saved || false);
+    } catch {
+      setIsSaved(false);
+    }
+  };
+
+  const handleSaveToggle = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (savingInProgress) return;
+
+    try {
+      setSavingInProgress(true);
+      if (isSaved) {
+        await savedItemsAPI.unsaveProject(project.id);
+        setIsSaved(false);
+      } else {
+        await savedItemsAPI.saveProject(project.id);
+        setIsSaved(true);
+      }
+    } catch (err) {
+      console.error('Failed to toggle save:', err);
+      alert('Failed to update saved status');
+    } finally {
+      setSavingInProgress(false);
+    }
+  };
+
   // Helper to format duration
   const formatDuration = (duration) => {
     const durationMap = {
@@ -61,7 +104,20 @@ export default function ProjectCard({ project }) {
   };
 
   return (
-    <Link to={`/projects/${project.id}`}>
+    <Link to={`/projects/${project.id}`} className="relative block">
+      {showSaveButton && (
+        <button
+          onClick={handleSaveToggle}
+          disabled={savingInProgress}
+          className="absolute top-4 right-4 z-10 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition disabled:opacity-50"
+          title={isSaved ? 'Remove from saved' : 'Save for later'}
+        >
+          <Bookmark
+            size={18}
+            className={isSaved ? 'text-purple-600 fill-purple-600' : 'text-gray-400'}
+          />
+        </button>
+      )}
       <div className="bg-white rounded-xl shadow-md border-2 border-gray-200 p-6 hover:shadow-xl hover:border-purple-400 transition-all cursor-pointer">
         {/* Header with Title and Category */}
         <div className="mb-4">
@@ -112,7 +168,7 @@ export default function ProjectCard({ project }) {
           {/* Budget - Most Important */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-600">
-              <DollarSign className="w-4 h-4 text-green-600" />
+              <IndianRupee className="w-4 h-4 text-green-600" />
               <span className="text-sm font-medium">Budget:</span>
             </div>
             <span className="text-base font-bold text-green-600">

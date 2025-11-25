@@ -1,87 +1,125 @@
-// frontend/src/pages/JobDetail.jsx
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, Calendar, MapPin, Award, Briefcase, LogIn, Trash2 } from 'lucide-react';
-import { jobsAPI } from '../api/jobs';
-import { jobApplicationsAPI } from '../api/jobApplications';
-import JobApplicationForm from '../components/JobApplicationForm';
-import { CheckCircle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  IndianRupee,
+  Calendar,
+  MapPin,
+  Award,
+  Trash2,
+  CheckCircle,
+  Edit,
+} from "lucide-react";
+import { jobsAPI } from "../api/jobs";
+import { jobApplicationsAPI } from "../api/jobApplications";
+import JobApplicationForm from "../components/JobApplicationForm";
 
 const EXPERIENCE_MAP = {
-  entry: 'Entry Level',
-  intermediate: 'Intermediate',
-  expert: 'Expert',
+  entry: "Entry Level",
+  intermediate: "Intermediate",
+  expert: "Expert",
 };
 
 const LOCATION_MAP = {
-  remote: 'Remote',
-  hybrid: 'Hybrid',
-  onsite: 'Onsite',
+  remote: "Remote",
+  hybrid: "Hybrid",
+  onsite: "Onsite",
 };
 
 export default function JobDetail({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [userApplication, setUserApplication] = useState(null);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [checkingApplication, setCheckingApplication] = useState(true);
+  const [applications, setApplications] = useState([]);
 
+  // Load main job + role-specific data
   useEffect(() => {
     loadJob();
-    if (user?.role === 'freelancer') {
+
+    if (user?.role === "freelancer") {
       checkUserApplication();
     } else {
+      // For non-freelancers, we don't wait on application check
       setCheckingApplication(false);
     }
+
+    if (user?.role === "client") {
+      loadApplicationsForClient();
+    }
   }, [id, user]);
+
+  // Auto-refresh freelancer application every 10s
+  useEffect(() => {
+    if (user?.role === "freelancer" && userApplication) {
+      const interval = setInterval(() => {
+        checkUserApplication();
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [user, userApplication]);
 
   const loadJob = async () => {
     try {
       setLoading(true);
       const res = await jobsAPI.get(id);
       setJob(res.data);
-    } catch (err) {
-      console.error('Failed to load job:', err);
-      setError('Failed to load job details');
+    } catch {
+      setError("Failed to load job details");
     } finally {
       setLoading(false);
     }
   };
 
-  // Check if THIS user has already applied to THIS job
   const checkUserApplication = async () => {
     try {
       setCheckingApplication(true);
       const response = await jobApplicationsAPI.list();
       const list = response.data.results || response.data || [];
       const parsedId = parseInt(id, 10);
-      const myApp = list.find(
-        (app) =>
-          (app.job === parsedId || app.job_id === parsedId) &&
-          (app.applicant === user?.id ||
-            app.freelancer === user?.id ||
-            app.freelancer_id === user?.id ||
-            app.user === user?.id)
-      ) || null;
+
+      const myApp =
+        list.find(
+          (app) =>
+            (app.job === parsedId || app.job_id === parsedId) &&
+            (app.applicant === user?.id ||
+              app.freelancer === user?.id ||
+              app.freelancer_id === user?.id ||
+              app.user === user?.id)
+        ) || null;
+
       setUserApplication(myApp);
     } catch (err) {
-      console.error('Failed to check application:', err);
+      console.error("Failed to check application:", err);
+      setUserApplication(null);
     } finally {
       setCheckingApplication(false);
     }
   };
 
+  const loadApplicationsForClient = async () => {
+    try {
+      const res = await jobApplicationsAPI.list({ job: id });
+      setApplications(res.data.results || []);
+    } catch (err) {
+      console.error("Failed to load applications for client:", err);
+      setApplications([]);
+    }
+  };
+
   const handleDeleteJob = async () => {
-    if (!window.confirm('Delete this job? This cannot be undone.')) return;
+    if (!window.confirm("Delete this job? This cannot be undone.")) return;
+
     try {
       await jobsAPI.remove(id);
-      navigate('/dashboard/client');
+      navigate("/dashboard/client");
     } catch {
-      alert('Failed to delete job');
+      alert("Failed to delete job");
     }
   };
 
@@ -91,58 +129,54 @@ export default function JobDetail({ user }) {
       await jobApplicationsAPI.create(formData);
       setShowApplicationModal(false);
       await checkUserApplication();
-      alert('Application submitted successfully!');
+      alert("Application submitted successfully!");
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to submit application');
+      alert(err.response?.data?.detail || "Failed to submit application");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleApplyClick = () => {
-    if (!user) {
-      navigate('/signin');
-      return;
+  const approveApplication = async (appId) => {
+    if (!window.confirm("Accept this application?")) return;
+
+    try {
+      await jobApplicationsAPI.accept(appId);
+      alert("Application accepted successfully!");
+      loadApplicationsForClient();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Could not approve application");
     }
-    if (user.role !== 'freelancer') {
-      alert('Only freelancers can apply to jobs');
-      return;
+  };
+
+  const rejectApplication = async (appId) => {
+    if (!window.confirm("Reject this application?")) return;
+
+    try {
+      await jobApplicationsAPI.reject(appId);
+      alert("Application rejected.");
+      loadApplicationsForClient();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Could not reject application");
     }
-    setShowApplicationModal(true);
   };
 
   if (loading || checkingApplication) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
-        <p className="mt-4 text-gray-600">Loading job details...</p>
-      </div>
-    );
-  }
-
-  if (error && !job) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600 font-medium">{error}</p>
-          <button
-            onClick={() => navigate('/jobs')}
-            className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            Back to Jobs
-          </button>
-        </div>
+      <div className="text-center py-10">
+        <div className="animate-spin h-12 w-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto" />
+        <p className="mt-3 text-gray-600">Loading job details...</p>
       </div>
     );
   }
 
   if (!job) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <p className="text-gray-600">Job not found</p>
+      <div className="text-center py-10">
+        <p className="text-gray-600 mb-3">{error || "Job not found"}</p>
         <button
-          onClick={() => navigate('/jobs')}
-          className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          onClick={() => navigate("/jobs")}
+          className="px-6 py-2 bg-purple-600 text-white rounded-lg"
         >
           Back to Jobs
         </button>
@@ -152,77 +186,80 @@ export default function JobDetail({ user }) {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="bg-white rounded-lg shadow-md p-8 mb-6">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2">{job.title}</h1>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-                  Open
-                </span>
-                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold capitalize">
-                  {job.job_type === 'hourly' ? 'Hourly' : 'Fixed Price'}
-                </span>
-                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
-                  {EXPERIENCE_MAP[job.experience_level] || job.experience_level}
-                </span>
-                {job.location_type && (
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold capitalize">
-                    {LOCATION_MAP[job.location_type] || job.location_type}
-                  </span>
-                )}
-              </div>
-            </div>
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="bg-white shadow p-8 rounded-xl">
+          {/* HEADER */}
+          <h1 className="text-4xl font-bold">{job.title}</h1>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
+              {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+            </span>
+            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold capitalize">
+              {job.job_type === "hourly" ? "Hourly" : "Fixed Price"}
+            </span>
+            <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-semibold">
+              {EXPERIENCE_MAP[job.experience_level]}
+            </span>
+            {job.location_type && (
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-semibold capitalize">
+                {LOCATION_MAP[job.location_type]}
+              </span>
+            )}
           </div>
 
-          {/* Delete button for job owner */}
+          {/* DELETE BUTTON */}
           {user?.id === job.client && (
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mt-4">
+              {/* Only allow edit if no applications received */}
+              {applications.length === 0 && (
+                <button
+                  onClick={() => navigate(`/jobs/${job.id}/edit`)}
+                  className="px-4 py-2 bg-blue-50 border border-blue-300 text-blue-700 rounded-lg flex items-center gap-2 hover:bg-blue-100"
+                >
+                  <Edit size={16} /> Edit Job
+                </button>
+              )}
+              
               <button
                 onClick={handleDeleteJob}
-                className="px-3 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg flex items-center gap-2 text-sm"
+                className="px-4 py-2 bg-red-50 border border-red-300 text-red-700 rounded-lg flex items-center gap-2 hover:bg-red-100"
               >
                 <Trash2 size={16} /> Delete Job
               </button>
             </div>
           )}
+          {/* DESCRIPTION */}
+          <p className="mt-6 text-gray-700 text-lg leading-relaxed">
+            {job.description}
+          </p>
 
-          {/* Description */}
-          <p className="text-gray-700 mb-6 text-lg leading-relaxed">{job.description}</p>
-
-          {/* Job Info Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 bg-gray-50 p-6 rounded-lg">
-            <div className="flex flex-col">
+          {/* INFO GRID */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 bg-gray-50 p-6 rounded-lg">
+            <div>
               <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <DollarSign size={18} className="text-green-600" />
+                <IndianRupee size={18} className="text-green-600" />
                 <span className="text-sm font-medium">Payment</span>
               </div>
               <span className="text-xl font-bold text-green-600">
-                {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
+                {job.job_type === "hourly" && job.hourly_min && job.hourly_max
                   ? `₹${job.hourly_min} - ₹${job.hourly_max}/hr`
-                  : job.job_type === 'fixed' && job.fixed_amount
+                  : job.job_type === "fixed" && job.fixed_amount
                   ? `₹${job.fixed_amount}`
-                  : 'Not specified'}
-              </span>
-              <span className="text-xs text-gray-500 mt-1">
-                {job.job_type === 'hourly' ? 'Per Hour' : 'Fixed Price'}
+                  : "Not specified"}
               </span>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <Award size={18} />
                 <span className="text-sm font-medium">Experience</span>
               </div>
               <span className="text-lg font-bold text-gray-900">
-                {EXPERIENCE_MAP[job.experience_level] || job.experience_level}
+                {EXPERIENCE_MAP[job.experience_level]}
               </span>
-              <span className="text-xs text-gray-500 mt-1">Required Level</span>
             </div>
 
-            <div className="flex flex-col">
+            <div>
               <div className="flex items-center gap-2 text-gray-600 mb-1">
                 <MapPin size={18} />
                 <span className="text-sm font-medium">Location</span>
@@ -230,120 +267,141 @@ export default function JobDetail({ user }) {
               <span className="text-lg font-bold text-gray-900">
                 {LOCATION_MAP[job.location_type] || job.location_type}
               </span>
-              <span className="text-xs text-gray-500 mt-1">
-                {job.location || 'Any Location'}
-              </span>
             </div>
           </div>
 
-          {/* Posted Date */}
-          <div className="flex items-center gap-4 text-sm text-gray-600 border-t pt-4 mb-6">
+          {/* POSTED INFO */}
+          <div className="flex items-center gap-4 text-sm text-gray-600 border-t pt-4 mt-6">
             <div className="flex items-center gap-2">
               <Calendar size={16} />
               <span>Posted: {new Date(job.created_at).toLocaleDateString()}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span>by <strong>{job.client_name || 'Client'}</strong></span>
+              <span>
+                by <strong>{job.client_name || "Client"}</strong>
+              </span>
             </div>
           </div>
 
-          {/* Attachments */}
-          {Array.isArray(job.file_attachments) && job.file_attachments.length > 0 && (
-            <div className="mt-6 border-t pt-6">
-              <h3 className="text-lg font-semibold mb-3">Attachments</h3>
-              <ul className="space-y-2">
-                {job.file_attachments.map((att) => (
-                  <li
-                    key={att.id}
-                    className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-gray-50"
-                  >
-                    <span className="text-sm font-medium truncate">{att.original_name || 'Attachment'}</span>
-                    <a
-                      href={att.file_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-                      download
+          {/* FILE ATTACHMENTS */}
+          {Array.isArray(job.file_attachments) &&
+            job.file_attachments.length > 0 && (
+              <div className="mt-6 border-t pt-6">
+                <h3 className="text-lg font-semibold mb-3">Attachments</h3>
+                <ul className="space-y-2">
+                  {job.file_attachments.map((att) => (
+                    <li
+                      key={att.id}
+                      className="flex justify-between items-center border rounded-lg px-4 py-3 hover:bg-gray-50"
                     >
-                      Download
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Actions for Non-Logged-In Users */}
-          {!user && job.status === 'open' && (
-            <div className="mt-6 border-t pt-6">
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 text-center">
-                <LogIn className="mx-auto mb-3 text-blue-600" size={48} />
-                <h3 className="text-lg font-bold text-blue-900 mb-2">
-                  Interested in this job?
-                </h3>
-                <p className="text-blue-700 mb-4">
-                  Sign in as a freelancer to apply
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <button
-                    onClick={() => navigate('/signin')}
-                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    onClick={() => navigate('/signup')}
-                    className="px-6 py-3 bg-white border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold"
-                  >
-                    Sign Up
-                  </button>
-                </div>
+                      <span className="text-sm font-medium">
+                        {att.original_name || "Attachment"}
+                      </span>
+                      <a
+                        href={att.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                        download
+                      >
+                        Download
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Freelancer Actions */}
-          {user?.role === 'freelancer' && job.status === 'open' && (
-            <div className="mt-6 border-t pt-6">
-              {!userApplication ? (
+          {/* FREELANCER APPLY STATUS */}
+          {user?.role === "freelancer" && (
+            <div className="mt-10 border-t pt-6">
+              {!userApplication && job.status === "open" ? (
                 <button
-                  onClick={handleApplyClick}
-                  className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg"
+                  onClick={() => setShowApplicationModal(true)}
+                  className="px-8 py-4 bg-purple-600 text-white rounded-lg text-lg shadow hover:bg-purple-700 font-semibold"
                 >
                   Apply for this Job
                 </button>
-              ) : (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
+              ) : userApplication ? (
+                <div
+                  className={`border-2 rounded-xl p-6 ${
+                    userApplication.status === "accepted"
+                      ? "bg-green-50 border-green-200"
+                      : userApplication.status === "rejected"
+                      ? "bg-red-50 border-red-200"
+                      : "bg-blue-50 border-blue-200"
+                  }`}
+                >
                   <div className="flex items-center gap-3 mb-3">
-                    <CheckCircle className="text-blue-600" size={28} />
-                    <span className="font-bold text-blue-900 text-lg">Application Submitted</span>
+                    <CheckCircle
+                      className={
+                        userApplication.status === "accepted"
+                          ? "text-green-600"
+                          : userApplication.status === "rejected"
+                          ? "text-red-600"
+                          : "text-blue-600"
+                      }
+                      size={28}
+                    />
+                    <span
+                      className={`font-bold text-lg ${
+                        userApplication.status === "accepted"
+                          ? "text-green-900"
+                          : userApplication.status === "rejected"
+                          ? "text-red-900"
+                          : "text-blue-900"
+                      }`}
+                    >
+                      {userApplication.status === "accepted" &&
+                        "Application Accepted"}
+                      {userApplication.status === "rejected" &&
+                        "Application Rejected"}
+                      {userApplication.status === "pending" &&
+                        "Application Submitted"}
+                    </span>
                   </div>
-                  <p className="text-blue-700 mb-3 text-base">
-                    Status: <span className="font-semibold capitalize">{userApplication.status}</span>
+
+                  <p className="text-base text-gray-700 mb-3">
+                    Status:{" "}
+                    <span className="font-semibold capitalize">
+                      {userApplication.status}
+                    </span>
                   </p>
+
                   <p className="text-blue-600 text-sm mb-3">
-                    Your application has been sent to the client. You'll be notified when they respond.
+                    Your application has been sent to the client. You'll be
+                    notified when they respond.
                   </p>
-                  <button
-                    onClick={() => navigate('/jobs')}
-                    className="text-blue-600 hover:underline font-medium"
-                  >
-                    Browse Other Jobs →
-                  </button>
+
+                  <div className="flex gap-3 items-center">
+                    <button
+                      onClick={() => navigate("/jobs")}
+                      className="font-medium text-purple-600 hover:underline"
+                    >
+                      Browse Other Jobs →
+                    </button>
+
+                    <button
+                      onClick={() => checkUserApplication()}
+                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm"
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
           {/* Freelancer viewing closed job */}
-          {user?.role === 'freelancer' && job.status !== 'open' && (
+          {user?.role === "freelancer" && job.status !== "open" && (
             <div className="mt-6 border-t pt-6">
               <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 text-center">
                 <p className="text-yellow-800 font-semibold text-base mb-2">
                   This job is no longer accepting applications
                 </p>
                 <button
-                  onClick={() => navigate('/jobs')}
+                  onClick={() => navigate("/jobs")}
                   className="text-yellow-600 hover:underline font-medium"
                 >
                   Browse Other Jobs →
@@ -352,25 +410,178 @@ export default function JobDetail({ user }) {
             </div>
           )}
 
-          {/* Client viewing their own job */}
-          {user?.role === 'client' && user.id !== job.client && (
+          {/* Client viewing job managed by another client */}
+          {user?.role === "client" && user.id !== job.client && (
             <div className="mt-6 border-t pt-6">
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-                <p className="text-gray-700">This job posting is managed by another client.</p>
+                <p className="text-gray-700">
+                  This job posting is managed by another client.
+                </p>
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {showApplicationModal && (
-        <JobApplicationForm
-          job={job}
-          onSubmit={handleSubmitApplication}
-          onClose={() => setShowApplicationModal(false)}
-          isLoading={submitting}
-        />
-      )}
+          {/* CLIENT: APPLICATION LIST (only for job owner) */}
+          {user?.role === "client" && user.id === job.client && (
+            <section className="mt-10 border-t pt-6">
+              <h2 className="text-xl font-bold mb-4 text-purple-800">
+                Applications Received ({applications.length})
+              </h2>
+
+              {applications.length === 0 && (
+                <p className="text-gray-500">No applications received yet.</p>
+              )}
+
+              <ul className="space-y-6">
+                {applications.map((app) => {
+                  const freelancer = app.freelancer || {};
+
+                  return (
+                    <li
+                      className="bg-white border border-purple-200 rounded-xl p-6 shadow"
+                      key={app.id}
+                    >
+                      {/* FREELANCER INFO */}
+                      <div className="flex gap-4 items-start">
+                        <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center text-2xl text-purple-600 font-bold">
+                          {freelancer.name?.[0] || "?"}
+                        </div>
+
+                        <div className="flex-1">
+                          <div className="flex gap-2 items-center flex-wrap">
+                            <h3 className="text-xl font-bold text-gray-900">
+                              {freelancer.name || "Freelancer"}
+                            </h3>
+
+                            {/* STATUS BADGE */}
+                            <span
+                              className="px-4 py-1 rounded-full text-xs font-semibold"
+                              style={{
+                                backgroundColor:
+                                  app.status === "pending"
+                                    ? "#FEF3C7"
+                                    : app.status === "accepted"
+                                    ? "#D1FADF"
+                                    : "#FECACA",
+                                color:
+                                  app.status === "pending"
+                                    ? "#92400E"
+                                    : app.status === "accepted"
+                                    ? "#166534"
+                                    : "#B91C1C",
+                              }}
+                            >
+                              {app.status.toUpperCase()}
+                            </span>
+                          </div>
+
+                          <div className="flex gap-6 text-sm text-gray-600 mt-2 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <MapPin size={14} />{" "}
+                              {freelancer.location || "Unknown"}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Award
+                                size={14}
+                                className="text-yellow-500"
+                              />{" "}
+                              Rating {freelancer.rating || "0.0"}
+                            </span>
+                            <span>
+                              Projects {freelancer.projectsCount || "0"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* BID DETAILS */}
+                      <div className="bg-purple-50 p-4 rounded-lg flex justify-between mt-4">
+                        <div>
+                          <p className="text-xs text-gray-500 font-semibold">
+                            Bid Amount
+                          </p>
+                          <h3 className="text-2xl font-bold text-purple-700">
+                            ₹{app.bid_amount}
+                          </h3>
+                        </div>
+
+                        <div>
+                          <p className="text-xs text-gray-500 font-semibold">
+                            Estimated Time
+                          </p>
+                          <h3 className="text-2xl font-bold text-purple-700">
+                            {app.estimated_time}
+                          </h3>
+                        </div>
+                      </div>
+
+                      {/* COVER LETTER */}
+                      <div className="mt-4">
+                        <h4 className="font-bold text-gray-900 mb-1">
+                          Cover Letter
+                        </h4>
+                        <p className="text-gray-700">{app.cover_letter}</p>
+                      </div>
+
+                      {/* ACTION BUTTONS */}
+                      <div className="flex gap-4 mt-5 flex-wrap">
+                        {/* VIEW FULL DETAILS */}
+                        <button
+                          onClick={() =>
+                            navigate(`/talent/${freelancer.id}`)
+                          }
+                          className="px-5 py-2 border border-gray-300 rounded-md bg-white hover:bg-purple-50 font-medium"
+                        >
+                          View Full Details
+                        </button>
+
+                        {/* CHAT */}
+                        <button
+                          onClick={() =>
+                            navigate(`/messages?user=${freelancer.id}`)
+                          }
+                          className="px-5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-800 font-medium"
+                        >
+                          Start Chat
+                        </button>
+
+                        {/* ACCEPT / REJECT */}
+                        {app.status === "pending" && (
+                          <>
+                            <button
+                              onClick={() => approveApplication(app.id)}
+                              className="px-5 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-medium"
+                            >
+                              ✓ Accept
+                            </button>
+
+                            <button
+                              onClick={() => rejectApplication(app.id)}
+                              className="px-5 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 font-medium"
+                            >
+                              ✗ Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+        </div>
+
+        {/* APPLICATION FORM MODAL */}
+        {showApplicationModal && (
+          <JobApplicationForm
+            job={job}
+            onSubmit={handleSubmitApplication}
+            onClose={() => setShowApplicationModal(false)}
+            isLoading={submitting}
+          />
+        )}
+      </div>
     </div>
   );
 }

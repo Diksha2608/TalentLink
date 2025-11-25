@@ -52,20 +52,10 @@ export default function Clients() {
     setSearchTerm('');
   };
 
-    const handleStartConversation = async (clientId) => {
-    try {
-        const res = await messagesAPI.getOrCreateThreadWith(clientId);
-        const threadId = res.data?.id || res.data?.thread?.id;
-        if (threadId) {
-        navigate(`/messages/${threadId}`);
-        } else {
-        navigate('/messages'); // fallback
-        }
-    } catch (e) {
-        console.error('start chat failed', e);
-        navigate('/messages'); // fallback
-    }
-    };
+  const handleStartConversation = (clientId) => {
+    // Messages.jsx listens to ?user= or ?userId= and opens that user's chat
+    navigate(`/messages?user=${clientId}`);
+  };
   return (
     <div className="min-h-screen bg-gray-50 py-6">
       <div className="container mx-auto px-4">
@@ -222,8 +212,13 @@ export default function Clients() {
                         )}
                         <div className="flex items-center gap-1">
                           <Briefcase size={16} />
-                          <span>{clientData.client_profile?.projects_posted || 0} projects</span>
+                          <span>
+                            {(clientData.client_profile?.projects_posted ?? 0)} projects
+                            {' · '}
+                            {(clientData.client_profile?.jobs_posted ?? 0)} jobs
+                          </span>
                         </div>
+
                       </div>
 
                       <button

@@ -89,6 +89,11 @@ class ProposalViewSet(viewsets.ModelViewSet):
         Contract.objects.get_or_create(
             proposal=proposal,
             defaults={
+                'client': proposal.project.client,
+                'freelancer': proposal.freelancer,
+                'status': 'pending',
+                'client_signed': False,
+                'freelancer_signed': False,
                 'terms': 'Project terms as discussed',
                 'payment_terms': 'Payment on completion'
             }

@@ -6,6 +6,9 @@ class ProjectsConfig(AppConfig):
     name = 'projects'
     verbose_name = 'Project Management'
 
+    def ready(self):
+        # Import signal handlers
+        import projects.signals  # noqa
 
 
 

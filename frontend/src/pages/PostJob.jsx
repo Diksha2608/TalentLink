@@ -170,6 +170,23 @@ export default function PostJob({ user }) {
               </button>
             </div>
           </div>
+          
+          {/* Experience Level */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Experience Level *
+            </label>
+            <select
+              required
+              value={formData.experience_level}
+              onChange={(e) => setFormData({ ...formData, experience_level: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            >
+              <option value="entry">Entry Level</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="expert">Expert</option>
+            </select>
+          </div>
 
           {/* Payment */}
           {formData.job_type === 'hourly' ? (
