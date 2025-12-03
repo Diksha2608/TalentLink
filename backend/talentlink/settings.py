@@ -32,7 +32,8 @@ INSTALLED_APPS = [
     'messaging.apps.MessagingConfig',
     'notifications.apps.NotificationsConfig',
     'jobs.apps.JobsConfig',
-    'saved_items.apps.SavedItemsConfig'
+    'saved_items.apps.SavedItemsConfig',
+    'workspaces.apps.WorkspacesConfig'
 ]
 
 MIDDLEWARE = [

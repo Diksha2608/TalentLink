@@ -7,12 +7,18 @@ class Notification(models.Model):
     TYPE_PROPOSAL = 'proposal'
     TYPE_CONTRACT = 'contract'
     TYPE_SYSTEM = 'system'
+    TYPE_WORKSPACE = 'workspace'  # ✅ NEW
+    TYPE_PAYMENT = 'payment'      # ✅ NEW
+    TYPE_REVIEW = 'review'        # ✅ NEW
 
     TYPE_CHOICES = (
         (TYPE_MESSAGE, 'Message'),
         (TYPE_PROPOSAL, 'Proposal'),
         (TYPE_CONTRACT, 'Contract'),
         (TYPE_SYSTEM, 'System'),
+        (TYPE_WORKSPACE, 'Workspace'),  # ✅ NEW
+        (TYPE_PAYMENT, 'Payment'),      # ✅ NEW
+        (TYPE_REVIEW, 'Review'),        # ✅ NEW
     )
 
     user = models.ForeignKey(

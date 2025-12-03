@@ -37,7 +37,8 @@ import EditJob from './pages/EditJob';
 import ExternalReviewForm from './components/ExternalReviewForm';
 import ReviewsPage from './pages/ReviewsPage';
 import SavedItemsPage from './pages/SavedItemsPage';
-
+import Workspace from './pages/Workspace';
+import WorkspaceDetail from './pages/WorkspaceDetail';
 import './App.css';
 
 function App() {
@@ -136,7 +137,16 @@ function AppLayout({ user, setUser, loading }) {
           <Route path="/contracts" element={<Contracts user={user} />} />
           <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
           <Route path="/contracts/:id/review" element={<ContractReview user={user} />} />
-
+          <Route path="/workspace" element={
+            <ProtectedRoute user={user}>
+              <Workspace user={user} />
+            </ProtectedRoute>
+          } />
+          <Route path="/workspace/:id" element={
+            <ProtectedRoute user={user}>
+              <WorkspaceDetail user={user} />
+            </ProtectedRoute>
+          } />
           <Route
             path="/dashboard/freelancer"
             element={

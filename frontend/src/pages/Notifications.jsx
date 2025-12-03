@@ -102,6 +102,20 @@ export default function Notifications() {
       } else {
         navigate('/contracts');
       }
+    } else if (notif.type === 'workspace' || notif.type === 'WORKSPACE') {
+      if (meta.workspace_id) {
+        navigate(`/workspace/${meta.workspace_id}`);
+      } else {
+        navigate('/workspace');
+      }
+    } else if (notif.type === 'payment' || notif.type === 'PAYMENT') {
+      if (meta.workspace_id) {
+        navigate(`/workspace/${meta.workspace_id}`);
+      } else {
+    if (type === 'workspace' || type === 'WORKSPACE') return <FileText size={18} className="text-indigo-600" />;
+    if (type === 'payment' || type === 'PAYMENT') return <FileText size={18} className="text-emerald-600" />;
+        navigate('/workspace');
+      }
     } else {
       navigate('/notifications');
     }

@@ -301,6 +301,16 @@ export default function ContractDetail({ user }) {
                 <span className="font-semibold">This contract has been completed</span>
               </div>
             )}
+\n            {/* Workspace Link for Active Contracts */}
+            {contract.status === 'active' && (
+              <Link
+                to={`/workspace`}
+                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
+              >
+                <FileText size={20} />
+                Go to Workspace
+              </Link>
+            )}
           </div>
 
             {showReviewButton && (

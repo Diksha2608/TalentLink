@@ -20,7 +20,10 @@ from contracts.views import ContractViewSet, ReviewViewSet, ReviewStatsView
 from messaging.views import MessageViewSet
 from notifications.views import NotificationViewSet
 from jobs.views import JobViewSet, JobApplicationViewSet
-
+from workspaces.views import (
+    WorkspaceViewSet, WorkspaceTaskViewSet,
+    PaymentTransactionViewSet, PaymentRequestViewSet
+)
 # ====== ROOT RESPONSE ======
 def api_root(request):
     return JsonResponse({
@@ -54,7 +57,10 @@ router.register(r'messages', MessageViewSet, basename='message')
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'jobs', JobViewSet, basename='job')
 router.register(r'job-applications', JobApplicationViewSet, basename='job-application')
-
+router.register(r'workspaces', WorkspaceViewSet, basename='workspace')
+router.register(r'tasks', WorkspaceTaskViewSet, basename='workspace-task')
+router.register(r'payments', PaymentTransactionViewSet, basename='payment-transaction')
+router.register(r'payment-requests', PaymentRequestViewSet, basename='payment-request')
 
 # ====== URL PATTERNS ======
 urlpatterns = [
@@ -70,6 +76,7 @@ urlpatterns = [
     path('api/messages/', include('messaging.urls')),
     path('api/jobs/', include('jobs.urls')),
     path('api/saved-items/', include('saved_items.urls')),
+    path('api/', include('workspaces.urls')),
 ]
 
 

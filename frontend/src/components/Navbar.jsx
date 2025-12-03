@@ -227,6 +227,16 @@ export default function Navbar({ user, setUser, loading }) {
                   Messages
                 </Link>
                 <Link
+                  to="/workspace"
+                  className={`text-sm font-medium transition no-underline ${
+                    location.pathname.includes('workspace')
+                      ? 'text-purple-600'
+                      : 'text-gray-700 hover:text-purple-600'
+                  }`}
+                >
+                  Workspace
+                </Link>
+                <Link
                   to="/contracts"
                   className={`text-sm font-medium transition no-underline ${
                     location.pathname.includes('contracts')
