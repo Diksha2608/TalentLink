@@ -1,3 +1,4 @@
+// frontend/src/pages/JobDetail.jsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -38,14 +39,12 @@ export default function JobDetail({ user }) {
   const [checkingApplication, setCheckingApplication] = useState(true);
   const [applications, setApplications] = useState([]);
 
-  // Load main job + role-specific data
   useEffect(() => {
     loadJob();
 
     if (user?.role === "freelancer") {
       checkUserApplication();
     } else {
-      // For non-freelancers, we don't wait on application check
       setCheckingApplication(false);
     }
 
@@ -54,7 +53,6 @@ export default function JobDetail({ user }) {
     }
   }, [id, user]);
 
-  // Auto-refresh freelancer application every 10s
   useEffect(() => {
     if (user?.role === "freelancer" && userApplication) {
       const interval = setInterval(() => {
@@ -207,10 +205,9 @@ export default function JobDetail({ user }) {
             )}
           </div>
 
-          {/* DELETE BUTTON */}
+          {/* DELETE / EDIT */}
           {user?.id === job.client && (
             <div className="flex gap-2 mt-4">
-              {/* Only allow edit if no applications received */}
               {applications.length === 0 && (
                 <button
                   onClick={() => navigate(`/jobs/${job.id}/edit`)}
@@ -219,7 +216,7 @@ export default function JobDetail({ user }) {
                   <Edit size={16} /> Edit Job
                 </button>
               )}
-              
+
               <button
                 onClick={handleDeleteJob}
                 className="px-4 py-2 bg-red-50 border border-red-300 text-red-700 rounded-lg flex items-center gap-2 hover:bg-red-100"
@@ -228,6 +225,7 @@ export default function JobDetail({ user }) {
               </button>
             </div>
           )}
+
           {/* DESCRIPTION */}
           <p className="mt-6 text-gray-700 text-lg leading-relaxed">
             {job.description}
@@ -453,7 +451,6 @@ export default function JobDetail({ user }) {
                               {freelancer.name || "Freelancer"}
                             </h3>
 
-                            {/* STATUS BADGE */}
                             <span
                               className="px-4 py-1 rounded-full text-xs font-semibold"
                               style={{
@@ -495,7 +492,7 @@ export default function JobDetail({ user }) {
                       </div>
 
                       {/* BID DETAILS */}
-                      <div className="bg-purple-50 p-4 rounded-lg flex justify-between mt-4">
+                      <div className="bg-purple-50 p-4 rounded-lg flex flex-wrap gap-6 mt-4">
                         <div>
                           <p className="text-xs text-gray-500 font-semibold">
                             Bid Amount
@@ -505,14 +502,17 @@ export default function JobDetail({ user }) {
                           </h3>
                         </div>
 
-                        <div>
-                          <p className="text-xs text-gray-500 font-semibold">
-                            Estimated Time
-                          </p>
-                          <h3 className="text-2xl font-bold text-purple-700">
-                            {app.estimated_time}
-                          </h3>
-                        </div>
+                        {/* Only show timing info if freelancer actually provided it */}
+                        {app.estimated_time && (
+                          <div>
+                            <p className="text-xs text-gray-500 font-semibold">
+                              Proposed Timing (optional)
+                            </p>
+                            <h3 className="text-2xl font-bold text-purple-700">
+                              {app.estimated_time}
+                            </h3>
+                          </div>
+                        )}
                       </div>
 
                       {/* COVER LETTER */}
@@ -525,7 +525,6 @@ export default function JobDetail({ user }) {
 
                       {/* ACTION BUTTONS */}
                       <div className="flex gap-4 mt-5 flex-wrap">
-                        {/* VIEW FULL DETAILS */}
                         <button
                           onClick={() =>
                             navigate(`/talent/${freelancer.id}`)
@@ -535,7 +534,6 @@ export default function JobDetail({ user }) {
                           View Full Details
                         </button>
 
-                        {/* CHAT */}
                         <button
                           onClick={() =>
                             navigate(`/messages?user=${freelancer.id}`)
@@ -545,7 +543,6 @@ export default function JobDetail({ user }) {
                           Start Chat
                         </button>
 
-                        {/* ACCEPT / REJECT */}
                         {app.status === "pending" && (
                           <>
                             <button

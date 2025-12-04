@@ -14,34 +14,33 @@ export default function Workspace({ user }) {
     loadWorkspaces();
   }, []);
 
-const loadWorkspaces = async () => {
-  try {
-    setLoading(true);
-    const res = await workspacesAPI.list();
+  const loadWorkspaces = async () => {
+    try {
+      setLoading(true);
+      const res = await workspacesAPI.list();
 
-    let data = res.data;
+      let data = res.data;
 
-    // Normalize to always be an array
-    if (Array.isArray(data)) {
-      setWorkspaces(data);
-    } else if (Array.isArray(data.results)) {
-      // DRF paginated response
-      setWorkspaces(data.results);
-    } else if (Array.isArray(data.workspaces)) {
-      // Custom wrapper like { workspaces: [...] }
-      setWorkspaces(data.workspaces);
-    } else {
-      console.error('Unexpected workspaces response:', data);
+      // Normalize to always be an array
+      if (Array.isArray(data)) {
+        setWorkspaces(data);
+      } else if (Array.isArray(data.results)) {
+        // DRF paginated response
+        setWorkspaces(data.results);
+      } else if (Array.isArray(data.workspaces)) {
+        // Custom wrapper like { workspaces: [...] }
+        setWorkspaces(data.workspaces);
+      } else {
+        console.error('Unexpected workspaces response:', data);
+        setWorkspaces([]);
+      }
+    } catch (err) {
+      console.error('Failed to load workspaces:', err);
       setWorkspaces([]);
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Failed to load workspaces:', err);
-    setWorkspaces([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const filteredWorkspaces = workspaces.filter((ws) => {
     if (filter === 'active') return ws.contract_status === 'active';
@@ -85,7 +84,9 @@ const loadWorkspaces = async () => {
             <Layers className="text-purple-600" size={40} />
             Workspaces
           </h1>
-          <p className="text-gray-600">Manage your active projects and track progress</p>
+          <p className="text-gray-600">
+            Manage your active projects and jobs, and track progress in one place
+          </p>
         </div>
 
         {/* Filters */}
@@ -133,7 +134,9 @@ const loadWorkspaces = async () => {
               Workspaces are created automatically when contracts become active.
             </p>
             <button
-              onClick={() => navigate(user?.role === 'client' ? '/dashboard/client' : '/dashboard/freelancer')}
+              onClick={() =>
+                navigate(user?.role === 'client' ? '/dashboard/client' : '/dashboard/freelancer')
+              }
               className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
             >
               Go to Dashboard
@@ -154,17 +157,30 @@ const loadWorkspaces = async () => {
                   {/* Header */}
                   <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white">
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-lg line-clamp-2">{workspace.contract_title}</h3>
+                      <h3 className="font-bold text-lg line-clamp-2">
+                        {workspace.contract_title}
+                      </h3>
                       <ArrowRight
                         className="text-white opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
                         size={20}
                       />
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center flex-wrap gap-2 text-sm">
                       <span className="flex items-center gap-1">
                         <Briefcase size={14} />
                         {workspace.contract_status}
                       </span>
+
+                      {/* NEW: show whether this is a Job or Project workspace */}
+                      {workspace.workspace_type && (
+                        <span className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                          <Layers size={12} />
+                          {workspace.workspace_type === 'job'
+                            ? 'Job Workspace'
+                            : 'Project Workspace'}
+                        </span>
+                      )}
+
                       {workspace.is_fully_completed && (
                         <span className="flex items-center gap-1 bg-green-400 px-2 py-0.5 rounded-full">
                           <CheckCircle size={12} />
@@ -180,11 +196,15 @@ const loadWorkspaces = async () => {
                     <div className="mb-4 text-sm">
                       <div className="flex justify-between mb-1">
                         <span className="text-gray-600">Client:</span>
-                        <span className="font-medium text-gray-900">{workspace.client_name}</span>
+                        <span className="font-medium text-gray-900">
+                          {workspace.client_name}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Freelancer:</span>
-                        <span className="font-medium text-gray-900">{workspace.freelancer_name}</span>
+                        <span className="font-medium text-gray-900">
+                          {workspace.freelancer_name}
+                        </span>
                       </div>
                     </div>
 
@@ -199,7 +219,9 @@ const loadWorkspaces = async () => {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${getProgressColor(taskProgress)} transition-all duration-500`}
+                          className={`h-2 rounded-full ${getProgressColor(
+                            taskProgress
+                          )} transition-all duration-500`}
                           style={{ width: `${taskProgress}%` }}
                         />
                       </div>
@@ -216,28 +238,36 @@ const loadWorkspaces = async () => {
                           <TrendingUp size={14} />
                           Payment Progress
                         </span>
-                        <span className="font-bold text-gray-900">{paymentProgress}%</span>
+                        <span className="font-bold text-gray-900">
+                          {paymentProgress}%
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${getProgressColor(paymentProgress)} transition-all duration-500`}
+                          className={`h-2 rounded-full ${getProgressColor(
+                            paymentProgress
+                          )} transition-all duration-500`}
                           style={{ width: `${paymentProgress}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>₹{workspace.paid_amount.toLocaleString()} paid</span>
-                        <span>₹{workspace.total_amount.toLocaleString()} total</span>
-                      </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>₹{workspace.paid_amount.toLocaleString()} paid</span>
+                      <span>₹{workspace.total_amount.toLocaleString()} total</span>
+                    </div>
                     </div>
 
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-2 pt-4 border-t">
                       <div className="text-center">
-                        <div className="text-lg font-bold text-purple-600">{workspace.pending_tasks}</div>
+                        <div className="text-lg font-bold text-purple-600">
+                          {workspace.pending_tasks}
+                        </div>
                         <div className="text-xs text-gray-500">Pending</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-red-600">{workspace.overdue_tasks}</div>
+                        <div className="text-lg font-bold text-red-600">
+                          {workspace.overdue_tasks}
+                        </div>
                         <div className="text-xs text-gray-500">Overdue</div>
                       </div>
                       <div className="text-center">

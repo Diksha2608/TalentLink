@@ -7,8 +7,10 @@ import {
 import { projectsAPI } from '../api/projects';
 import { proposalsAPI } from '../api/proposals';
 import { formatCurrency } from '../utils/currency';
-// ⬇️ NEW: bring in your existing card
+
 import FreelancerCard from '../components/FreelancerCard';
+import SkillSelector from '../components/SkillSelector'; // ✅ NEW
+
 
 const DURATION_MAP = {
   less_1_month: 'Less than 1 month',
@@ -32,7 +34,17 @@ export default function ProjectDetail({ user }) {
   const [proposals, setProposals] = useState([]);
   const [userProposal, setUserProposal] = useState(null);
   const [showProposalModal, setShowProposalModal] = useState(false);
-  const [proposalForm, setProposalForm] = useState({ cover_letter: '', bid_amount: '', estimated_time: '' });
+  const [proposalForm, setProposalForm] = useState({
+    cover_letter: '',
+    bid_amount: '',
+    estimated_time: '',
+    proposed_solution: '',
+    portfolio_links: '',
+    availability: '',
+    resume_file: null,
+    portfolio_files: [],
+  });
+  const [selectedSkills, setSelectedSkills] = useState([]); 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -110,16 +122,61 @@ export default function ProjectDetail({ user }) {
       return;
     }
     setError('');
+
     try {
-      await proposalsAPI.create({ project: id, ...proposalForm });
+      const formData = new FormData();
+      formData.append('project', id);
+      formData.append('cover_letter', proposalForm.cover_letter);
+      formData.append('bid_amount', proposalForm.bid_amount);
+      formData.append('estimated_time', proposalForm.estimated_time);
+
+      // ✅ NEW fields
+      if (proposalForm.proposed_solution)
+        formData.append('proposed_solution', proposalForm.proposed_solution);
+      if (proposalForm.portfolio_links)
+        formData.append('portfolio_links', proposalForm.portfolio_links);
+      if (proposalForm.availability)
+        formData.append('availability', proposalForm.availability);
+
+      // ✅ Relevant skills ids (SkillSelector)
+      (selectedSkills || []).forEach((skill) => {
+        if (skill?.id != null) {
+          formData.append('relevant_skills_ids', skill.id);
+        }
+      });
+
+      // ✅ Files: resume + up to 5 portfolio files
+      if (proposalForm.resume_file) {
+        formData.append('resume', proposalForm.resume_file);
+      }
+      (proposalForm.portfolio_files || []).slice(0, 5).forEach((file) => {
+        formData.append('portfolio_files', file);
+      });
+
+      const res = await proposalsAPI.create(formData);
+
       setShowProposalModal(false);
-      setProposalForm({ cover_letter: '', bid_amount: '', estimated_time: '' });
-      checkUserProposal();
+      setProposalForm({
+        cover_letter: '',
+        bid_amount: '',
+        estimated_time: '',
+        proposed_solution: '',
+        portfolio_links: '',
+        availability: '',
+        resume_file: null,
+        portfolio_files: [],
+      });
+      setSelectedSkills([]);
+
+      // so freelancer can view submitted proposal
+      setUserProposal(res.data);
+
       alert('Proposal submitted successfully!');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to submit proposal');
     }
   };
+
 
   const handleAcceptProposal = async (proposalId) => {
     try {
@@ -324,10 +381,13 @@ export default function ProjectDetail({ user }) {
             </div>
           )}
 
-          {user?.role === 'freelancer' && (
+          {user?.role === 'freelancer' && ( 
             <div className="mt-6 border-t pt-6">
               {canSubmitProposal ? (
-                <button onClick={handleProposalButtonClick} className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg">
+                <button
+                  onClick={handleProposalButtonClick}
+                  className="w-full sm:w-auto px-8 py-4 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-lg shadow-lg"
+                >
                   Submit Proposal
                 </button>
               ) : userProposal ? (
@@ -339,15 +399,34 @@ export default function ProjectDetail({ user }) {
                   <p className="text-blue-700 mb-3 text-base">
                     Status: <span className="font-semibold capitalize">{userProposal.status}</span>
                   </p>
-                  <button onClick={() => navigate('/projects')} className="text-blue-600 hover:underline font-medium">
-                    Browse Other Projects →
-                  </button>
+
+                  {/* ✅ NEW: view submitted proposal + keep existing browse button */}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/proposals/${userProposal.id}`)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold"
+                    >
+                      View Submitted Proposal
+                    </button>
+                    <button
+                      onClick={() => navigate('/projects')}
+                      className="text-blue-600 hover:underline font-medium text-sm"
+                    >
+                      Browse Other Projects →
+                    </button>
+                  </div>
                 </div>
               ) : (
                 project.status !== 'open' && (
                   <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6">
-                    <p className="text-yellow-800 font-semibold text-base mb-2">This project is no longer accepting proposals</p>
-                    <button onClick={() => navigate('/projects')} className="text-yellow-600 hover:underline font-medium">
+                    <p className="text-yellow-800 font-semibold text-base mb-2">
+                      This project is no longer accepting proposals
+                    </p>
+                    <button
+                      onClick={() => navigate('/projects')}
+                      className="text-yellow-600 hover:underline font-medium"
+                    >
                       Browse Other Projects →
                     </button>
                   </div>
@@ -355,6 +434,7 @@ export default function ProjectDetail({ user }) {
               )}
             </div>
           )}
+
 
           {user?.role === 'client' && user.id !== project.client && (
             <div className="mt-6 border-t pt-6">
@@ -440,6 +520,14 @@ export default function ProjectDetail({ user }) {
                           <MessageCircle size={14} /> Chat
                         </button>
 
+                        {/* ✅ NEW: open full proposal page */}
+                        <button
+                          onClick={() => navigate(`/proposals/${p.id}`)}
+                          className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 text-xs font-medium"
+                        >
+                          View Proposal
+                        </button>
+
                         {p.status === 'pending' ? (
                           <>
                             <button
@@ -456,13 +544,18 @@ export default function ProjectDetail({ user }) {
                             </button>
                           </>
                         ) : (
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            p.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-semibold ${
+                              p.status === 'accepted'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
+                          >
                             {p.status.toUpperCase()}
                           </span>
                         )}
                       </div>
+
                     </div>
                   );
                 })}
@@ -474,7 +567,7 @@ export default function ProjectDetail({ user }) {
         {/* ===== Submit proposal modal  ===== */}
         {showProposalModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full p-8 relative max-h-screen overflow-y-auto">
+            <div className="bg-white rounded-lg max-w-5xl w-full p-8 relative max-h-screen overflow-y-auto">
               <button onClick={() => setShowProposalModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
@@ -483,46 +576,184 @@ export default function ProjectDetail({ user }) {
 
               {error && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-4">{error}</div>}
 
-              <form onSubmit={handleSubmitProposal} className="space-y-4">
+              <form onSubmit={handleSubmitProposal} className="space-y-6">
+                {/* Cover letter - full width */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Cover Letter</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Cover Letter <span className="text-red-500">*</span>
+                  </label>
                   <textarea
                     required
                     value={proposalForm.cover_letter}
-                    onChange={(e) => setProposalForm({ ...proposalForm, cover_letter: e.target.value })}
-                    rows={6}
+                    onChange={(e) =>
+                      setProposalForm({ ...proposalForm, cover_letter: e.target.value })
+                    }
+                    rows={4}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
                     placeholder="Explain why you're the best fit for this project..."
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Your Bid Amount (₹)</label>
-                  <input
-                    type="number" required min="0" step="0.01"
-                    value={proposalForm.bid_amount}
-                    onChange={(e) => setProposalForm({ ...proposalForm, bid_amount: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
-                    placeholder="e.g., 5000.00"
+                {/* Bid / Time / Availability - 3 in grid so less scrolling */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bid Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={proposalForm.bid_amount}
+                      onChange={(e) =>
+                        setProposalForm({ ...proposalForm, bid_amount: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+                      placeholder="e.g., 5000.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Estimated Time <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={proposalForm.estimated_time}
+                      onChange={(e) =>
+                        setProposalForm({ ...proposalForm, estimated_time: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+                      placeholder="e.g., 2 weeks"
+                    />
+                  </div>
+
+                  {/* Availability dropdown (recommended) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Availability (recommended)
+                    </label>
+                    <select
+                      value={proposalForm.availability}
+                      onChange={(e) =>
+                        setProposalForm({ ...proposalForm, availability: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+                    >
+                      <option value="">Select availability</option>
+                      <option value="less_10">Less than 10 hrs/week</option>
+                      <option value="10_30">10–30 hrs/week</option>
+                      <option value="more_30">More than 30 hrs/week</option>
+                      <option value="full_time">Full-time for this project</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Proposed Solution + Portfolio Links */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Proposed Solution (optional)
+                    </label>
+                    <textarea
+                      value={proposalForm.proposed_solution}
+                      onChange={(e) =>
+                        setProposalForm({ ...proposalForm, proposed_solution: e.target.value })
+                      }
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+                      placeholder="Briefly outline how you will approach this project..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Portfolio Links (optional)
+                    </label>
+                    <textarea
+                      value={proposalForm.portfolio_links}
+                      onChange={(e) =>
+                        setProposalForm({ ...proposalForm, portfolio_links: e.target.value })
+                      }
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
+                      placeholder="Paste relevant portfolio URLs (one per line or comma-separated)"
+                    />
+                  </div>
+                </div>
+
+                {/* Relevant skills via SkillSelector (recommended) */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-800">
+                      Relevant Skills (recommended)
+                    </h3>
+                    <span className="text-xs text-gray-500">Helps clients match your expertise</span>
+                  </div>
+                  <SkillSelector
+                    selectedSkills={selectedSkills}
+                    setSelectedSkills={setSelectedSkills}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Completion Time</label>
-                  <input
-                    type="text" required
-                    value={proposalForm.estimated_time}
-                    onChange={(e) => setProposalForm({ ...proposalForm, estimated_time: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
-                    placeholder="e.g., 2 weeks"
-                  />
+                {/* File uploads: Resume + portfolio files */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Resume (optional)
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.rtf,.odt"
+                      onChange={(e) =>
+                        setProposalForm({
+                          ...proposalForm,
+                          resume_file: e.target.files?.[0] || null,
+                        })
+                      }
+                      className="w-full text-sm text-gray-700"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Upload your CV / resume for this proposal.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Portfolio Files (optional, max 5)
+                    </label>
+                    <input
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.ppt,.pptx"
+                      onChange={(e) =>
+                        setProposalForm({
+                          ...proposalForm,
+                          portfolio_files: Array.from(e.target.files || []).slice(0, 5),
+                        })
+                      }
+                      className="w-full text-sm text-gray-700"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Attach up to 5 relevant work samples.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex justify-end gap-3 mt-6">
-                  <button type="button" onClick={() => setShowProposalModal(false)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowProposalModal(false)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
                     Cancel
                   </button>
-                  <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
                     Submit Proposal
                   </button>
                 </div>

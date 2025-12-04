@@ -42,7 +42,12 @@ export default function ReviewCard({ review, showResponse = true, currentUserId 
   };
 
   const isExternal = localReview.review_type === 'external';
-  const reviewerName = localReview.reviewer_name_display || 'Anonymous';
+
+  // 🔒 Anonymise who gave the review – no real names shown publicly
+  const reviewerLabel = isExternal
+    ? 'Testimonial'
+    : 'Verified TalentLink user';
+
 
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition p-6">
@@ -51,17 +56,17 @@ export default function ReviewCard({ review, showResponse = true, currentUserId 
         <div className="flex items-start gap-3 flex-1">
           {/* Reviewer Avatar/Initial */}
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-            {reviewerName.charAt(0).toUpperCase()}
+            {reviewerLabel.charAt(0).toUpperCase()}
           </div>
 
           {/* Reviewer Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-gray-900 truncate">{reviewerName}</h3>
+              <h3 className="font-semibold text-gray-900 truncate">{reviewerLabel}</h3>
               {isExternal && (
                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1">
                   <ExternalLink size={12} />
-                  External
+                  Testimonial
                 </span>
               )}
               {localReview.is_verified && (
@@ -91,27 +96,29 @@ export default function ReviewCard({ review, showResponse = true, currentUserId 
         <RatingDisplay rating={localReview.rating} showNumber={false} />
       </div>
 
-      {/* Project Info */}
-      {(localReview.project_title || localReview.contract_title) && (
+      {/* Engagement Info (no project name shown) */}
+      {localReview.work_period && (
         <div className="mb-3 p-3 bg-gray-50 rounded-lg">
           <p className="text-sm text-gray-700 flex items-center gap-2">
-            <Briefcase size={14} className="text-gray-500" />
-            <span className="font-medium">Project:</span>
-            {localReview.project_title || localReview.contract_title}
+            <Calendar size={14} className="text-gray-500" />
+            <span className="font-medium">Engagement period:</span>
+            <span>{localReview.work_period}</span>
           </p>
-          {localReview.work_period && (
-            <p className="text-xs text-gray-600 ml-6 mt-1">
-              {localReview.work_period}
-            </p>
-          )}
         </div>
       )}
+
 
       {/* Review Comment */}
       {localReview.comment && (
         <div className="mb-4">
           <p className="text-gray-700 leading-relaxed">{localReview.comment}</p>
         </div>
+      )}
+
+      {isExternal && (
+        <p className="text-xs text-gray-500 mb-2">
+          This is a testimonial from outside TalentLink. It is not verified.
+        </p>
       )}
 
       {/* Response Section */}

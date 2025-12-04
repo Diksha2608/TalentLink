@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator
 
 User = get_user_model()
 
+
 class Job(models.Model):
     """
     Separate model for hourly/contract jobs (different from fixed-price projects)
@@ -44,14 +45,19 @@ class Job(models.Model):
     location = models.CharField(max_length=200, blank=True, null=True)
 
     # For hourly jobs
-    hourly_min = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
-    hourly_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    hourly_min = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                     validators=[MinValueValidator(0)])
+    hourly_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                     validators=[MinValueValidator(0)])
 
     # For fixed price jobs
-    fixed_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+    fixed_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                       validators=[MinValueValidator(0)])
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
-    visibility = models.CharField(max_length=20, choices=[('public', 'Public'), ('private', 'Private')], default='public')
+    visibility = models.CharField(max_length=20,
+                                  choices=[('public', 'Public'), ('private', 'Private')],
+                                  default='public')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -86,7 +92,10 @@ class JobApplication(models.Model):
     freelancer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='job_applications_sent')
     cover_letter = models.TextField()
     bid_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    estimated_time = models.CharField(max_length=100)
+
+    # NOW OPTIONAL: estimated time should not be forced for jobs like receptionist
+    estimated_time = models.CharField(max_length=100, blank=True, null=True)
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -99,8 +108,10 @@ class JobApplication(models.Model):
         return f"Application by {self.freelancer} for {self.job}"
 
     def save(self, *args, **kwargs):
-    
-        if self.status == 'accepted' and self.pk:
+        """
+        When an application transitions to accepted, mark the job as in_progress.
+        """
+        if self.pk and self.status == 'accepted':
             old_status = JobApplication.objects.get(pk=self.pk).status
             if old_status != 'accepted':
                 self.job.status = 'in_progress'

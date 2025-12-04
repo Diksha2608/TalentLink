@@ -1,6 +1,4 @@
-from django.shortcuts import render
-
-# Create your views here.
+# backend/workspaces/views.py
 from django.db.models import Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -27,7 +25,6 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Return workspaces where user is client or freelancer"""
         user = self.request.user
         return Workspace.objects.filter(
             Q(contract__client=user) | Q(contract__freelancer=user)
@@ -39,7 +36,7 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def mark_complete(self, request, pk=None):
         """
-        Mark workspace as complete from user's side
+        Mark workspace (project OR job) as complete from user's side
         """
         workspace = self.get_object()
         user = request.user
@@ -69,7 +66,7 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         workspace.save()
         workspace.check_and_complete()
 
-        # Notify other party
+        # Notify other party (generic wording, works for jobs and projects)
         other_party = (
             workspace.contract.freelancer if user == workspace.contract.client
             else workspace.contract.client
@@ -78,52 +75,41 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         Notification.objects.create(
             user=other_party,
             type='WORKSPACE',
-            title='Project Completion Confirmation',
-            message=f'{marker} has marked the project as complete.',
+            title='Workspace Completion Confirmation',
+            message=f'{marker} has marked this engagement as complete.',
             metadata={'workspace_id': workspace.id}
         )
 
         if workspace.is_fully_completed:
-            # Notify both parties
-            Notification.objects.create(
-                user=workspace.contract.client,
-                type='WORKSPACE',
-                title='Project Completed!',
-                message='Both parties confirmed project completion.',
-                metadata={'workspace_id': workspace.id}
-            )
-            Notification.objects.create(
-                user=workspace.contract.freelancer,
-                type='WORKSPACE',
-                title='Project Completed!',
-                message='Both parties confirmed project completion.',
-                metadata={'workspace_id': workspace.id}
-            )
+            # Notify both parties once engagement is fully done
+            for u in [workspace.contract.client, workspace.contract.freelancer]:
+                Notification.objects.create(
+                    user=u,
+                    type='WORKSPACE',
+                    title='Workspace Completed!',
+                    message='Both parties confirmed completion of this engagement.',
+                    metadata={'workspace_id': workspace.id}
+                )
 
         return Response({
             'detail': f'{marker} marked as complete successfully.',
-            'workspace': WorkspaceSerializer(workspace).data
+            'workspace': WorkspaceSerializer(workspace, context={'request': request}).data
         })
 
     @action(detail=True, methods=['get'])
     def payment_stats(self, request, pk=None):
         """
         Get payment statistics for charts.
-        This mirrors WorkspaceSerializer's total/paid/remaining logic
-        so that cards and charts are always consistent.
         """
         workspace = self.get_object()
 
-        # Use the same computation as the serializer for consistency
         serializer = WorkspaceSerializer(workspace, context={'request': request})
         total = serializer.get_total_amount(workspace)
         paid = serializer.get_paid_amount(workspace)
         remaining = serializer.get_remaining_amount(workspace)
 
-        # Get all confirmed payments for timeline
         payments = workspace.payments.filter(status='confirmed').order_by('created_at')
 
-        # Timeline data (only confirmed payments)
         timeline = []
         cumulative = 0.0
         for payment in payments:
@@ -144,7 +130,6 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
             'payment_count': payments.count(),
             'timeline': timeline
         })
-
 
 class WorkspaceTaskViewSet(viewsets.ModelViewSet):
     """

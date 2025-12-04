@@ -17,6 +17,7 @@ class ProjectAttachmentSerializer(serializers.ModelSerializer):
         url = obj.file.url
         return request.build_absolute_uri(url) if request else url
 
+
 class ProjectSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     skills_required = SkillSerializer(many=True, read_only=True)
@@ -27,7 +28,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         source='skills_required',
         required=False
     )
-    proposal_count = serializers.SerializerMethodField()
+    proposal_count = serializers.SerializerMethodField()  # total proposals for this project
+
     duration_estimate = serializers.CharField(write_only=True, required=False, allow_blank=True)
     file_attachments = ProjectAttachmentSerializer(many=True, read_only=True)
 
@@ -41,12 +43,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             'experience_level', 'location_type', 'client_location',
             'status', 'visibility', 'attachments', 'category',
             'file_attachments',
-            'proposal_count', 'created_at', 'updated_at'
+            # proposal stats
+            'proposal_count',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['client', 'created_at', 'updated_at', 'status', 'proposal_count']
-        extra_kwargs = { 'attachments': {'read_only': True} }  
+        extra_kwargs = {'attachments': {'read_only': True}}
 
     def get_proposal_count(self, obj):
+        # total proposals linked to this project (all statuses)
         return obj.proposals.count()
 
     def validate(self, attrs):
@@ -67,7 +72,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context.get('request')
         skill_objs = validated_data.pop('skills_required', [])
-  
+
         project = Project.objects.create(**validated_data)
         if skill_objs:
             project.skills_required.set(skill_objs)

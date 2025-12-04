@@ -39,6 +39,7 @@ class ContractSerializer(serializers.ModelSerializer):
             'status',
             'terms',
             'payment_terms',
+            'attachment',      # ✅ NEW: attachment exposed
             'created_at',
             'has_client_reviewed',
             'has_freelancer_reviewed',
@@ -114,6 +115,16 @@ class ContractSerializer(serializers.ModelSerializer):
             and obj.freelancer_id
             and not self.get_has_freelancer_reviewed(obj)
         )
+
+    def update(self, instance, validated_data):
+        """
+        Prevent users from changing status / signatures via generic update.
+        Status changes & signing are handled only via dedicated actions.
+        """
+        validated_data.pop('status', None)
+        validated_data.pop('client_signed', None)
+        validated_data.pop('freelancer_signed', None)
+        return super().update(instance, validated_data)
 
 
 # ============================================================
@@ -240,7 +251,6 @@ class ExternalReviewCreateSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return review
-
 
 
 # ============================================================

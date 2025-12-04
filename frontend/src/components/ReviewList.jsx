@@ -119,7 +119,7 @@ export default function ReviewList({ userId, currentUserId = null }) {
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-blue-500"></div>
               <span className="text-gray-700">
-                <strong>{stats.external_reviews}</strong> External Reviews
+                <strong>{stats.external_reviews}</strong> Testimonials
               </span>
             </div>
           </div>
@@ -133,7 +133,7 @@ export default function ReviewList({ userId, currentUserId = null }) {
           {[
             { key: 'all', label: 'All Reviews' },
             { key: 'platform', label: 'Platform' },
-            { key: 'external', label: 'External' }
+            { key: 'external', label: 'Testimonials' }
           ].map(({ key, label }) => (
             <button
               key={key}

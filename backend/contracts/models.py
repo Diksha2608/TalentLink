@@ -64,6 +64,15 @@ class Contract(models.Model):
         blank=True,
         help_text="Payment terms or milestones."
     )
+
+    # Optional attachment uploaded by client
+    attachment = models.FileField(
+        upload_to='contracts/attachments/',
+        null=True,
+        blank=True,
+        help_text="Optional contract attachment uploaded by the client."
+    )
+
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
 
@@ -76,7 +85,7 @@ class Contract(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     # ============================================================
-    # PROPERTIES
+    # PROPERTIES / HELPERS
     # ============================================================
     def __str__(self):
         """Readable name for Django admin & debug output"""
@@ -92,10 +101,30 @@ class Contract(models.Model):
         return self.client_signed and self.freelancer_signed
 
     def activate_if_signed(self):
-        """Automatically mark contract as active when both parties sign."""
+        """
+        Automatically mark contract as active when both parties sign.
+
+        Also sync the related project/job status -> IN PROGRESS
+        so client and freelancer dashboards stay consistent.
+        """
         if self.is_fully_signed and self.status == 'pending':
+            # Activate contract
             self.status = 'active'
-            self.save()
+            self.save(update_fields=['status'])
+
+            # If this contract came from a project proposal, mark project in_progress
+            if self.proposal and getattr(self.proposal, 'project_id', None):
+                project = self.proposal.project
+                if hasattr(project, 'status') and project.status != 'in_progress':
+                    project.status = 'in_progress'
+                    project.save(update_fields=['status'])
+
+            # If this contract came from a job application, mark job in_progress
+            if self.job_application and getattr(self.job_application, 'job_id', None):
+                job = self.job_application.job
+                if hasattr(job, 'status') and job.status != 'in_progress':
+                    job.status = 'in_progress'
+                    job.save(update_fields=['status'])
 
     class Meta:
         ordering = ['-created_at']
@@ -108,7 +137,7 @@ class Contract(models.Model):
 # ============================================================
 class Review(models.Model):
     REVIEW_TYPE_CHOICES = (
-        ('platform', 'Platform Review'),  # Review from completed contract
+        ('platform', 'Platform Review'),   # Review from completed contract
         ('external', 'External Review'),   # Review from outside platform
     )
 
@@ -131,7 +160,7 @@ class Review(models.Model):
         blank=True,
         help_text="Reviewer (if registered user)"
     )
-    
+
     reviewee = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -166,7 +195,7 @@ class Review(models.Model):
         help_text="Rating from 1 to 5 stars"
     )
     comment = models.TextField(blank=True)
-    
+
     # Work details (for external reviews)
     project_title = models.CharField(
         max_length=300,
@@ -176,7 +205,7 @@ class Review(models.Model):
     work_period = models.CharField(
         max_length=100,
         blank=True,
-        help_text="e.g., 'Jan 2024 - Mar 2024'"
+        help_text="e.g. 'Jan 2024 - Mar 2024'"
     )
 
     # Verification
@@ -205,49 +234,32 @@ class Review(models.Model):
         ]
 
     def __str__(self):
-        reviewer_name = self.reviewer.get_full_name() if self.reviewer else self.reviewer_name
-        reviewee_name = self.reviewee.get_full_name() or self.reviewee.username
-        return f"Review by {reviewer_name} for {reviewee_name} ({self.rating}★)"
-
-    def save(self, *args, **kwargs):
-        # Auto-verify platform reviews
-        if self.review_type == 'platform':
-            self.is_verified = True
-        
-        super().save(*args, **kwargs)
-        
-        # Update reviewee's average rating
-        self.update_reviewee_rating()
-
-    def update_reviewee_rating(self):
-        """Update the reviewee's average rating"""
-        if self.reviewee:
-            verified_reviews = Review.objects.filter(
-                reviewee=self.reviewee,
-                is_verified=True
-            )
-            avg_rating = verified_reviews.aggregate(Avg('rating'))['rating__avg'] or 0
-            self.reviewee.rating_avg = round(avg_rating, 2)
-            self.reviewee.save(update_fields=['rating_avg'])
+        reviewer_name = self.reviewer_name or (self.reviewer.get_full_name() if self.reviewer else 'Anonymous')
+        return f"Review for {self.reviewee.get_full_name()} by {reviewer_name}"
 
 
-# ============================================================
-# REVIEW RESPONSE MODEL
-# ============================================================
 class ReviewResponse(models.Model):
-    """Allow users to respond to reviews they received"""
+    """Allow freelancers to publicly respond to reviews."""
     review = models.OneToOneField(
         Review,
         on_delete=models.CASCADE,
         related_name='response'
     )
-    response_text = models.TextField()
+    responder = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='review_responses',
+        null=True,       
+        blank=True       ,
+    )
+    message = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering = ['-created_at']
         verbose_name = "Review Response"
         verbose_name_plural = "Review Responses"
 
     def __str__(self):
-        return f"Response to review #{self.review.id}"
+        return f"Response by {self.responder.get_full_name()} to review #{self.review_id}"

@@ -14,22 +14,17 @@ import {
   IndianRupee
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { notificationsAPI } from '../api/notifications'; // ⬅️ new
+import { notificationsAPI } from '../api/notifications';
 import { messagesAPI } from '../api/messages';
 import { Star, Bookmark } from 'lucide-react';
 
 export default function Navbar({ user, setUser, loading }) {
   const [menuOpen, setMenuOpen] = useState(false);
-
-  // Search dropdown state 
   const [searchOpen, setSearchOpen] = useState(false);
-
-  // Profile / notifications / finances
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [financeDropdownOpen, setFinanceDropdownOpen] = useState(false);
 
-  // Notifications state
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -68,9 +63,10 @@ export default function Navbar({ user, setUser, loading }) {
     setUser(null);
     navigate('/');
   };
+
   const isFreelancer = !!user && user.role === 'freelancer';
-  const isClient =     !!user && user.role === 'client';
-  // Quick “Search for…” options
+  const isClient = !!user && user.role === 'client';
+
   const searchOptions = [
     { value: 'projects', label: 'Projects', path: '/projects' },
     { value: 'jobs', label: 'Jobs', path: '/jobs' },
@@ -82,7 +78,6 @@ export default function Navbar({ user, setUser, loading }) {
     if (opt) navigate(opt.path);
   };
 
-  // Notifications: load + poll
   useEffect(() => {
     if (!user) {
       setNotifications([]);
@@ -135,49 +130,32 @@ export default function Navbar({ user, setUser, loading }) {
 
     const meta = notif.metadata || {};
 
-    // MESSAGE
     if (notif.type === 'message') {
-      // We set this in signals.py
       if (meta.conversation_user_id) {
         navigate(`/messages?user=${meta.conversation_user_id}`);
       } else {
         navigate('/messages');
       }
-    }
-
-    // PROPOSAL
-    else if (notif.type === 'proposal') {
+    } else if (notif.type === 'proposal') {
       if (meta.proposal_id) {
-        // Direct to specific proposal 
         navigate(`/proposals/${meta.proposal_id}`);
       } else if (meta.project_id) {
-        // Fallback: go to that project's page / proposals list
         navigate(`/projects/${meta.project_id}`);
       } else {
-        navigate('/proposals'); 
+        navigate('/proposals');
       }
-    }
-
-    // CONTRACT
-    else if (notif.type === 'contract') {
+    } else if (notif.type === 'contract') {
       if (meta.contract_id) {
-        // If you add a detail page:
         navigate(`/contracts/${meta.contract_id}`);
-        // If you *only* have a contracts list:
-        // navigate(`/contracts?contract=${meta.contract_id}`);
       } else {
         navigate('/contracts');
       }
-    }
-
-    // SYSTEM / ANYTHING ELSE
-    else {
+    } else {
       navigate('/notifications');
     }
 
     setNotificationsOpen(false);
   };
-
 
   if (loading) {
     return (
@@ -247,95 +225,83 @@ export default function Navbar({ user, setUser, loading }) {
                   Contracts
                 </Link>
 
-                {/* Manage Finances */}
-                {/* Finance / Payments */}
-              {isFreelancer && (
-                <div className="relative" ref={financeRef}>
-                  <button
-                    onClick={() => setFinanceDropdownOpen(!financeDropdownOpen)}
-                    className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-purple-600 transition"
-                  >
-                    <IndianRupee size={16} />
-                    Manage Finances
-                    <ChevronDown
-                      size={14}
-                      className={`transition-transform ${financeDropdownOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
+                {/* Freelancer: Finances Dropdown */}
+                {isFreelancer && (
+                  <div className="relative" ref={financeRef}>
+                    <button
+                      onClick={() => setFinanceDropdownOpen(!financeDropdownOpen)}
+                      className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-purple-600 transition"
+                    >
+                      <IndianRupee size={16} />
+                      Finances
+                      <ChevronDown
+                        size={14}
+                        className={`transition-transform ${financeDropdownOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
 
-                  {financeDropdownOpen && (
-                    <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-                      <Link to="/earnings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
-                        onClick={() => setFinanceDropdownOpen(false)}>
-                        View Earnings
-                      </Link>
-                      <Link to="/payments" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
-                        onClick={() => setFinanceDropdownOpen(false)}>
-                        Payment Methods
-                      </Link>
-                      <Link to="/invoices" className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
-                        onClick={() => setFinanceDropdownOpen(false)}>
-                        Invoices
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isClient && (
-                <Link
-                  to="/payments"
-                  className="hidden lg:flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-purple-600 transition no-underline"
-                  title="Payments you've made"
-                >
-                  <IndianRupee size={16} />
-                  Payments
-                </Link>
-              )}
-
+                    {financeDropdownOpen && (
+                      <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                        <Link
+                          to="/earnings"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                          onClick={() => setFinanceDropdownOpen(false)}
+                        >
+                          View Earnings
+                        </Link>
+                        <Link
+                          to="/invoices"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                          onClick={() => setFinanceDropdownOpen(false)}
+                        >
+                          Invoices
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {/* "Search for..." dropdown (no text input) */}
+            {/* Search dropdown for freelancers */}
             {isFreelancer && (
-            <div className="hidden md:flex items-center relative" ref={searchRef}>
-              <button
-                type="button"
-                onClick={() => setSearchOpen(!searchOpen)}
-                className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-              >
-                <Search size={16} className="text-gray-400" />
-                <span>Search for...</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${searchOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-              {searchOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[9999]">
-                  {searchOptions.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        handleQuickSearchNavigate(opt.value);
-                        setSearchOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
+              <div className="hidden md:flex items-center relative" ref={searchRef}>
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(!searchOpen)}
+                  className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Search size={16} className="text-gray-400" />
+                  <span>Search for...</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform ${searchOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {searchOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[9999]">
+                    {searchOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          handleQuickSearchNavigate(opt.value);
+                          setSearchOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Client quick talent CTA stays */}
+            {/* Client quick talent CTA */}
             {user && user.role === 'client' && (
               <Link
                 to="/talent"
@@ -365,9 +331,7 @@ export default function Navbar({ user, setUser, loading }) {
                 {notificationsOpen && (
                   <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto z-40">
                     <div className="p-3 border-b border-gray-200 flex justify-between items-center">
-                      <h3 className="font-semibold text-gray-900">
-                        Notifications
-                      </h3>
+                      <h3 className="font-semibold text-gray-900">Notifications</h3>
                       <button
                         onClick={handleMarkAllRead}
                         className="text-xs text-purple-600 hover:text-purple-700 font-medium"
@@ -389,21 +353,15 @@ export default function Navbar({ user, setUser, loading }) {
                               {notif.title || notif.text}
                             </p>
                             {notif.message && (
-                              <p className="text-xs text-gray-600 mt-0.5">
-                                {notif.message}
-                              </p>
+                              <p className="text-xs text-gray-600 mt-0.5">{notif.message}</p>
                             )}
                             <p className="text-xs text-gray-500 mt-1">
-                              {new Date(
-                                notif.created_at
-                              ).toLocaleString()}
+                              {new Date(notif.created_at).toLocaleString()}
                             </p>
                           </div>
                         ))
                       ) : (
-                        <div className="p-3 text-sm text-gray-500">
-                          No notifications yet.
-                        </div>
+                        <div className="p-3 text-sm text-gray-500">No notifications yet.</div>
                       )}
                     </div>
                     <Link
@@ -418,7 +376,7 @@ export default function Navbar({ user, setUser, loading }) {
               </div>
             )}
 
-            {/* Profile dropdown / auth */}
+            {/* Profile dropdown */}
             {user ? (
               <div className="relative" ref={profileRef}>
                 <button
@@ -450,13 +408,11 @@ export default function Navbar({ user, setUser, loading }) {
                       </p>
                       <p className="text-xs text-gray-500">{user.email}</p>
                       <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
-                        {user.role === 'freelancer'
-                          ? 'Freelancer'
-                          : 'Client'}
+                        {user.role === 'freelancer' ? 'Freelancer' : 'Client'}
                       </span>
                     </div>
 
-<Link
+                    <Link
                       to="/profile"
                       className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
                       onClick={() => setProfileDropdownOpen(false)}
@@ -465,19 +421,27 @@ export default function Navbar({ user, setUser, loading }) {
                       Profile
                     </Link>
 
-                    {/* Reviews & Ratings */}
-                    {user && (
+                    <Link
+                      to="/reviews"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
+                      onClick={() => setProfileDropdownOpen(false)}
+                    >
+                      <Star size={16} />
+                      Reviews & Ratings
+                    </Link>
+
+                    {/* Client: Payments link below Reviews */}
+                    {isClient && (
                       <Link
-                        to="/reviews"
+                        to="/payments"
                         className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 no-underline"
                         onClick={() => setProfileDropdownOpen(false)}
                       >
-                        <Star size={16} />
-                        Reviews & Ratings
+                        <IndianRupee size={16} />
+                        Payments
                       </Link>
                     )}
 
-                    {/* Saved Items - Only for freelancers */}
                     {isFreelancer && (
                       <Link
                         to="/saved"
@@ -518,9 +482,7 @@ export default function Navbar({ user, setUser, loading }) {
                             'Are you sure you want to delete your account? This action cannot be undone.'
                           )
                         ) {
-                          alert(
-                            'Account deletion functionality to be implemented'
-                          );
+                          alert('Account deletion functionality to be implemented');
                         }
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -555,10 +517,7 @@ export default function Navbar({ user, setUser, loading }) {
             )}
 
             {/* Mobile menu */}
-            <button
-              className="md:hidden"
-              onClick={() => setMenuOpen(!menuOpen)}
-            >
+            <button className="md:hidden" onClick={() => setMenuOpen(!menuOpen)}>
               {menuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
@@ -569,28 +528,27 @@ export default function Navbar({ user, setUser, loading }) {
           <div className="md:hidden bg-gray-50 border-top p-4 space-y-3 mt-3">
             {user ? (
               <>
-                {/* Mobile quick search dropdown */}
-                <div className="mb-2">
-                  <label className="block text-xs text-gray-600 mb-1">
-                    Search for...
-                  </label>
-                  <select
-                    onChange={(e) => {
-                      if (e.target.value) {
-                        handleQuickSearchNavigate(e.target.value);
-                        e.target.value = '';
-                      }
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Select</option>
-                    {searchOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {isFreelancer && (
+                  <div className="mb-2">
+                    <label className="block text-xs text-gray-600 mb-1">Search for...</label>
+                    <select
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleQuickSearchNavigate(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Select</option>
+                      {searchOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {user.role === 'client' && (
                   <Link
@@ -603,11 +561,7 @@ export default function Navbar({ user, setUser, loading }) {
                 )}
 
                 <Link
-                  to={
-                    user.role === 'client'
-                      ? '/dashboard/client'
-                      : '/dashboard/freelancer'
-                  }
+                  to={user.role === 'client' ? '/dashboard/client' : '/dashboard/freelancer'}
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
                 >
                   Dashboard
@@ -624,24 +578,31 @@ export default function Navbar({ user, setUser, loading }) {
                 >
                   Contracts
                 </Link>
+
                 {isFreelancer && (
-                <>
-                <Link to="/earnings" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Earnings</Link>
-                <Link to="/payments" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Payment Methods</Link>
-                <Link to="/invoices" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Invoices</Link>
-                </>
+                  <>
+                    <Link
+                      to="/earnings"
+                      className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                    >
+                      Earnings
+                    </Link>
+                    <Link
+                      to="/invoices"
+                      className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                    >
+                      Invoices
+                    </Link>
+                  </>
                 )}
-                {isClient && (
-                <Link to="/payments" className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline">Payments</Link>
-                )}
-<Link
+
+                <Link
                   to="/profile"
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
                 >
                   Profile
                 </Link>
-                
-                {/* Mobile: Reviews & Ratings */}
+
                 {user && (
                   <Link
                     to="/reviews"
@@ -650,8 +611,16 @@ export default function Navbar({ user, setUser, loading }) {
                     Reviews & Ratings
                   </Link>
                 )}
-                
-                {/* Mobile: Saved Items - Only for freelancers */}
+
+                {isClient && (
+                  <Link
+                    to="/payments"
+                    className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"
+                  >
+                    Payments
+                  </Link>
+                )}
+
                 {isFreelancer && (
                   <Link
                     to="/saved"
@@ -660,7 +629,7 @@ export default function Navbar({ user, setUser, loading }) {
                     Saved Items
                   </Link>
                 )}
-                
+
                 <Link
                   to="/notifications"
                   className="block py-2 text-gray-700 hover:text-purple-600 font-medium no-underline"

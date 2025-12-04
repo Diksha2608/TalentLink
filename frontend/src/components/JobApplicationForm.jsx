@@ -39,17 +39,18 @@ export default function JobApplicationForm({ job, onSubmit, onClose, isLoading }
       return;
     }
 
-    if (!formData.estimated_time.trim()) {
-      setError('Estimated completion time is required');
-      return;
-    }
+    // 🔁 estimated_time is now OPTIONAL – no validation here
 
     const submitData = new FormData();
     submitData.append('job', job.id);
     submitData.append('cover_letter', formData.cover_letter);
     submitData.append('bid_amount', formData.bid_amount);
-    submitData.append('estimated_time', formData.estimated_time);
-    
+
+    // Only send estimated_time if user actually entered something
+    if (formData.estimated_time.trim()) {
+      submitData.append('estimated_time', formData.estimated_time);
+    }
+
     files.forEach((file) => {
       submitData.append('attachments', file);
     });
@@ -133,32 +134,33 @@ export default function JobApplicationForm({ job, onSubmit, onClose, isLoading }
                 value={formData.bid_amount}
                 onChange={(e) => setFormData({ ...formData, bid_amount: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
-                placeholder="e.g., 5000.00"
+                placeholder={job.job_type === 'hourly' ? 'e.g., 500.00 (per hour)' : 'e.g., 5000.00 (total)'}
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-500 mt-1">
-                {job.job_type === 'hourly' 
-                  ? 'Enter your hourly rate' 
+                {job.job_type === 'hourly'
+                  ? 'Enter your hourly rate'
                   : 'Enter your total project cost'}
               </p>
             </div>
 
-            {/* Estimated Time */}
+            {/* Estimated Time (Optional now) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estimated Completion Time <span className="text-red-500">*</span>
+                Estimated Completion Time <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
               <input
                 type="text"
-                required
+                // no `required` here now
                 value={formData.estimated_time}
                 onChange={(e) => setFormData({ ...formData, estimated_time: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white text-gray-900"
-                placeholder="e.g., 2 weeks, 1 month"
+                placeholder="Optional: e.g., 2 weeks, 1 month, or leave blank for ongoing roles"
                 disabled={isLoading}
               />
               <p className="text-xs text-gray-500 mt-1">
-                How long will it take to complete this job?
+                For fixed-scope work you can mention a rough timeline. For ongoing roles (e.g., receptionist),
+                you can leave this empty.
               </p>
             </div>
 
@@ -185,8 +187,8 @@ export default function JobApplicationForm({ job, onSubmit, onClose, isLoading }
                 >
                   <Upload className="text-gray-400 mb-2" size={32} />
                   <span className="text-sm text-gray-600">
-                    {files.length >= 3 
-                      ? 'Maximum 3 files reached' 
+                    {files.length >= 3
+                      ? 'Maximum 3 files reached'
                       : 'Click to upload (Max 3 files)'}
                   </span>
                   <span className="text-xs text-gray-500 mt-1">

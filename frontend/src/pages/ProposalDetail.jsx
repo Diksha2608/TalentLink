@@ -204,6 +204,60 @@ export default function ProposalDetail({ user }) {
             <h2 className="text-xl font-semibold mb-4">Cover Letter</h2>
             <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{proposal.cover_letter}</p>
           </div>
+          {/* Proposed Solution (optional) */}
+          {proposal.proposed_solution && (
+            <div className="mb-6 pb-6 border-b">
+              <h2 className="text-xl font-semibold mb-4">Proposed Solution</h2>
+              <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {proposal.proposed_solution}
+              </p>
+            </div>
+          )}
+
+          {/* Relevant Skills */}
+          {proposal.relevant_skills && proposal.relevant_skills.length > 0 && (
+            <div className="mb-6 pb-6 border-b">
+              <h2 className="text-xl font-semibold mb-4">Relevant Skills</h2>
+              <div className="flex flex-wrap gap-2">
+                {proposal.relevant_skills.map((skill) => (
+                  <span
+                    key={skill.id}
+                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium"
+                  >
+                    {skill.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Portfolio Links */}
+          {proposal.portfolio_links && (
+            <div className="mb-6 pb-6 border-b">
+              <h2 className="text-xl font-semibold mb-4">Portfolio Links</h2>
+              <ul className="space-y-2">
+                {proposal.portfolio_links
+                  .split(/[\n,]+/)
+                  .map((raw) => raw.trim())
+                  .filter(Boolean)
+                  .map((url, idx) => {
+                    const href = url.startsWith('http') ? url : `https://${url}`;
+                    return (
+                      <li key={idx}>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-purple-600 hover:underline break-all text-sm"
+                        >
+                          {url}
+                        </a>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </div>
+          )}
 
           {/* Submission Date */}
           <div className="mb-6 text-sm text-gray-600">
@@ -218,17 +272,57 @@ export default function ProposalDetail({ user }) {
               </div>
             )}
           </div>
+          {/* Additional Details */}
+          {proposal.availability && (
+            <div className="mb-6 text-sm text-gray-700">
+              <h3 className="text-base font-semibold mb-2">Availability</h3>
+              <p className="inline-flex px-3 py-1 bg-gray-100 rounded-full capitalize">
+                {proposal.availability.replace('_', ' ')}
+              </p>
+            </div>
+          )}
+
+          {/* Attached Files */}
+          {proposal.file_attachments && proposal.file_attachments.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold mb-4">Attached Files</h2>
+              <ul className="space-y-2">
+                {proposal.file_attachments.map((file) => (
+                  <li
+                    key={file.id}
+                    className="flex items-center justify-between border rounded-lg px-4 py-3 hover:bg-gray-50"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 truncate">
+                        {file.original_name || 'Attachment'}
+                        {file.is_resume && (
+                          <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                            Resume
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Uploaded: {new Date(file.uploaded_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <a
+                      href={file.file}
+                      target="_blank"
+                      rel="noreferrer"
+                      download
+                      className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+                    >
+                      Download
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Action Buttons */}
           {user?.role === 'client' && proposal.status === 'pending' && (
             <div className="flex gap-3 pt-6 border-t">
-              <button
-                onClick={handleChat}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-              >
-                <MessageCircle size={20} />
-                Start Chat
-              </button>
               <button
                 onClick={handleAccept}
                 className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
@@ -246,13 +340,41 @@ export default function ProposalDetail({ user }) {
 
           {user?.role === 'freelancer' && (
             <div className="pt-6 border-t">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                <p className="text-blue-800 font-medium">
-                  This is your proposal. The client will review and respond soon.
-                </p>
-              </div>
+              {proposal.status === 'pending' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                  <p className="text-blue-800 font-medium">
+                    This is your proposal. The client will review and respond soon.
+                  </p>
+                </div>
+              )}
+
+              {proposal.status === 'accepted' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <p className="text-green-800 font-medium">
+                    🎉 Your proposal has been <span className="font-semibold">accepted</span>.
+                    A contract has been created for this project.
+                  </p>
+                </div>
+              )}
+
+              {proposal.status === 'rejected' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                  <p className="text-red-800 font-medium">
+                    Your proposal was <span className="font-semibold">rejected</span> by the client.
+                  </p>
+                </div>
+              )}
+
+              {proposal.status === 'withdrawn' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                  <p className="text-gray-800 font-medium">
+                    You have <span className="font-semibold">withdrawn</span> this proposal.
+                  </p>
+                </div>
+              )}
             </div>
           )}
+
         </div>
       </div>
 

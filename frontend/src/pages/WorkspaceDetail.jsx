@@ -1,12 +1,13 @@
 // frontend/src/pages/WorkspaceDetail.jsx
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Plus, CheckCircle, Clock, AlertCircle, Trash2,
   Edit, Send, IndianRupee, TrendingUp, Calendar, User,
   MessageSquare, Filter, Download, FileText, DollarSign
 } from 'lucide-react';
 import { workspacesAPI } from '../api/workspaces';
+import { contractsAPI } from '../api/contracts';
 import { Line, Doughnut, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -51,7 +52,6 @@ export default function WorkspaceDetail({ user }) {
   const [editingTask, setEditingTask] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showAllComments, setShowAllComments] = useState(false);
-
   const [commentText, setCommentText] = useState('');
 
   const [newTask, setNewTask] = useState({
@@ -75,6 +75,9 @@ export default function WorkspaceDetail({ user }) {
     message: ''
   });
 
+  // related contract metadata for review
+  const [contractMeta, setContractMeta] = useState(null);
+
   useEffect(() => {
     loadWorkspaceData();
   }, [id]);
@@ -82,6 +85,8 @@ export default function WorkspaceDetail({ user }) {
   const loadWorkspaceData = async () => {
     try {
       setLoading(true);
+      setContractMeta(null);
+
       const [wsRes, tasksRes, paymentsRes, requestsRes, statsRes] = await Promise.all([
         workspacesAPI.get(id),
         workspacesAPI.getTasks(id),
@@ -90,11 +95,24 @@ export default function WorkspaceDetail({ user }) {
         workspacesAPI.getPaymentStats(id)
       ]);
 
-      setWorkspace(wsRes.data);
+      const ws = wsRes.data;
+      setWorkspace(ws);
       setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : tasksRes.data.results || []);
       setPayments(Array.isArray(paymentsRes.data) ? paymentsRes.data : paymentsRes.data.results || []);
-      setPaymentRequests(Array.isArray(requestsRes.data) ? requestsRes.data : requestsRes.data.results || []);
+      setPaymentRequests(
+        Array.isArray(requestsRes.data) ? requestsRes.data : requestsRes.data.results || []
+      );
       setPaymentStats(statsRes.data);
+
+      const contractId = ws.contract || ws.contract_id;
+      if (contractId) {
+        try {
+          const cRes = await contractsAPI.get(contractId);
+          setContractMeta(cRes.data);
+        } catch (err) {
+          console.error('Failed to load contract metadata for workspace:', err);
+        }
+      }
     } catch (err) {
       console.error('Failed to load workspace:', err);
       alert('Failed to load workspace data');
@@ -113,11 +131,9 @@ export default function WorkspaceDetail({ user }) {
       const taskData = {
         ...newTask,
         workspace: id,
-        // All tasks belong to the freelancer; backend also enforces this
-        assigned_to: workspace.freelancer_id,
+        assigned_to: workspace.freelancer_id
       };
 
-      // 🔹 Do NOT send an empty string for deadline
       if (!taskData.deadline) {
         delete taskData.deadline;
       }
@@ -130,7 +146,7 @@ export default function WorkspaceDetail({ user }) {
         priority: 'medium',
         status: 'todo',
         deadline: '',
-        assigned_to: null,
+        assigned_to: null
       });
       loadWorkspaceData();
     } catch (err) {
@@ -138,8 +154,6 @@ export default function WorkspaceDetail({ user }) {
       alert('Failed to create task');
     }
   };
-
-
 
   const handleUpdateTaskStatus = async (taskId, newStatus) => {
     try {
@@ -162,21 +176,18 @@ export default function WorkspaceDetail({ user }) {
       alert('Failed to delete task');
     }
   };
-    const taskTimelineData = useMemo(() => {
+
+  const taskTimelineData = useMemo(() => {
     if (!tasks || tasks.length === 0) return null;
 
-    // Only completed tasks with a completion date
-    const completed = tasks.filter(
-        (t) => t.status === 'completed' && t.completed_at
-    );
+    const completed = tasks.filter((t) => t.status === 'completed' && t.completed_at);
     if (completed.length === 0) return null;
 
     const byDate = {};
-
     completed.forEach((t) => {
-        const d = new Date(t.completed_at);
-        const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
-        byDate[key] = (byDate[key] || 0) + 1;
+      const d = new Date(t.completed_at);
+      const key = d.toISOString().slice(0, 10);
+      byDate[key] = (byDate[key] || 0) + 1;
     });
 
     const sortedDates = Object.keys(byDate).sort();
@@ -185,18 +196,18 @@ export default function WorkspaceDetail({ user }) {
     const data = [];
 
     sortedDates.forEach((date) => {
-        cumulative += byDate[date];
-        labels.push(date);
-        data.push(cumulative);
+      cumulative += byDate[date];
+      labels.push(date);
+      data.push(cumulative);
     });
 
     return {
-        labels,
-        data,
-        totalTasks: tasks.length,
-        completedCount: completed.length,
+      labels,
+      data,
+      totalTasks: tasks.length,
+      completedCount: completed.length
     };
-    }, [tasks]);
+  }, [tasks]);
 
   const handleAddComment = async (taskId) => {
     if (!commentText.trim()) return;
@@ -205,9 +216,8 @@ export default function WorkspaceDetail({ user }) {
       await workspacesAPI.addTaskComment(taskId, commentText);
       setCommentText('');
       loadWorkspaceData();
-      // Refresh selected task if viewing details
       if (selectedTask?.id === taskId) {
-        const updated = tasks.find(t => t.id === taskId);
+        const updated = tasks.find((t) => t.id === taskId);
         setSelectedTask(updated);
       }
     } catch (err) {
@@ -326,7 +336,7 @@ export default function WorkspaceDetail({ user }) {
     return colors[priority] || colors.medium;
   };
 
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task) => {
     if (taskFilter === 'all') return true;
     if (taskFilter === 'my-tasks') {
       return task.assigned_to === user.id || task.created_by === user.id;
@@ -334,41 +344,52 @@ export default function WorkspaceDetail({ user }) {
     return task.status === taskFilter;
   });
 
-  // Chart configurations
-  const paymentProgressData = paymentStats ? {
-    labels: ['Paid', 'Remaining'],
-    datasets: [{
-      data: [paymentStats.paid_amount, paymentStats.remaining_amount],
-      backgroundColor: ['#10b981', '#e5e7eb'],
-      borderColor: ['#059669', '#d1d5db'],
-      borderWidth: 2
-    }]
-  } : null;
+  const paymentProgressData = paymentStats
+    ? {
+        labels: ['Paid', 'Remaining'],
+        datasets: [
+          {
+            data: [paymentStats.paid_amount, paymentStats.remaining_amount],
+            backgroundColor: ['#10b981', '#e5e7eb'],
+            borderColor: ['#059669', '#d1d5db'],
+            borderWidth: 2
+          }
+        ]
+      }
+    : null;
 
-  const paymentTimelineData = paymentStats?.timeline ? {
-    labels: paymentStats.timeline.map(p => new Date(p.date).toLocaleDateString()),
-    datasets: [{
-      label: 'Cumulative Payment',
-      data: paymentStats.timeline.map(p => p.cumulative),
-      borderColor: '#8b5cf6',
-      backgroundColor: 'rgba(139, 92, 246, 0.1)',
-      tension: 0.4,
-      fill: true
-    }]
-  } : null;
+  const paymentTimelineData = paymentStats?.timeline
+    ? {
+        labels: paymentStats.timeline.map((p) =>
+          new Date(p.date).toLocaleDateString()
+        ),
+        datasets: [
+          {
+            label: 'Cumulative Payment',
+            data: paymentStats.timeline.map((p) => p.cumulative),
+            borderColor: '#8b5cf6',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      }
+    : null;
 
   const taskStatusData = {
     labels: ['To Do', 'In Progress', 'Completed', 'Overdue'],
-    datasets: [{
-      label: 'Tasks',
-      data: [
-        tasks.filter(t => t.status === 'todo').length,
-        tasks.filter(t => t.status === 'in_progress').length,
-        tasks.filter(t => t.status === 'completed').length,
-        tasks.filter(t => t.status === 'overdue').length
-      ],
-      backgroundColor: ['#9ca3af', '#3b82f6', '#10b981', '#ef4444']
-    }]
+    datasets: [
+      {
+        label: 'Tasks',
+        data: [
+          tasks.filter((t) => t.status === 'todo').length,
+          tasks.filter((t) => t.status === 'in_progress').length,
+          tasks.filter((t) => t.status === 'completed').length,
+          tasks.filter((t) => t.status === 'overdue').length
+        ],
+        backgroundColor: ['#9ca3af', '#3b82f6', '#10b981', '#ef4444']
+      }
+    ]
   };
 
   if (loading) {
@@ -404,6 +425,28 @@ export default function WorkspaceDetail({ user }) {
   const isClient = user.id === workspace.client_id;
   const isFreelancer = user.id === workspace.freelancer_id;
 
+  const canClientReview =
+    isClient &&
+    workspace.is_fully_completed &&
+    contractMeta?.client_can_review &&
+    user.id === contractMeta.client;
+
+  const canFreelancerReview =
+    isFreelancer &&
+    workspace.is_fully_completed &&
+    contractMeta?.freelancer_can_review &&
+    user.id === contractMeta.freelancer;
+
+  const showReviewButton = !!contractMeta && (canClientReview || canFreelancerReview);
+  const reviewButtonLabel = isClient
+    ? 'Review Freelancer'
+    : isFreelancer
+    ? 'Review Client'
+    : 'Leave Review';
+
+  const workspaceTypeLabel =
+    workspace.workspace_type === 'job' ? 'Job Workspace' : 'Project Workspace';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50 py-8">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -420,6 +463,10 @@ export default function WorkspaceDetail({ user }) {
           <div className="bg-white rounded-xl shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
+                {/* NEW: explicit Job / Project label */}
+                <p className="text-sm font-semibold text-purple-600 mb-1">
+                  {workspaceTypeLabel}
+                </p>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">
                   {workspace.contract_title}
                 </h1>
@@ -451,19 +498,27 @@ export default function WorkspaceDetail({ user }) {
             <div className="grid md:grid-cols-4 gap-4 mt-6">
               <div className="bg-purple-50 rounded-lg p-4">
                 <p className="text-sm text-purple-600 mb-1">Total Tasks</p>
-                <p className="text-2xl font-bold text-purple-900">{workspace.total_tasks}</p>
+                <p className="text-2xl font-bold text-purple-900">
+                  {workspace.total_tasks}
+                </p>
               </div>
               <div className="bg-green-50 rounded-lg p-4">
                 <p className="text-sm text-green-600 mb-1">Completed</p>
-                <p className="text-2xl font-bold text-green-900">{workspace.completed_tasks}</p>
+                <p className="text-2xl font-bold text-green-900">
+                  {workspace.completed_tasks}
+                </p>
               </div>
               <div className="bg-blue-50 rounded-lg p-4">
                 <p className="text-sm text-blue-600 mb-1">In Progress</p>
-                <p className="text-2xl font-bold text-blue-900">{workspace.pending_tasks}</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  {workspace.pending_tasks}
+                </p>
               </div>
               <div className="bg-red-50 rounded-lg p-4">
                 <p className="text-sm text-red-600 mb-1">Overdue</p>
-                <p className="text-2xl font-bold text-red-900">{workspace.overdue_tasks}</p>
+                <p className="text-2xl font-bold text-red-900">
+                  {workspace.overdue_tasks}
+                </p>
               </div>
             </div>
 
@@ -472,7 +527,11 @@ export default function WorkspaceDetail({ user }) {
               <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <Clock className="text-yellow-600" size={20} />
-                  <p className="font-semibold text-yellow-900">Project Completion Status</p>
+                  <p className="font-semibold text-yellow-900">
+                    {workspace.workspace_type === 'job'
+                      ? 'Job Completion Status'
+                      : 'Project Completion Status'}
+                  </p>
                 </div>
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
                   <div className="flex items-center gap-2">
@@ -482,7 +541,10 @@ export default function WorkspaceDetail({ user }) {
                       <Clock className="text-gray-400" size={18} />
                     )}
                     <span className="text-sm">
-                      Client {workspace.client_marked_complete ? 'confirmed completion' : 'pending'}
+                      Client{' '}
+                      {workspace.client_marked_complete
+                        ? 'confirmed completion'
+                        : 'pending'}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -492,7 +554,10 @@ export default function WorkspaceDetail({ user }) {
                       <Clock className="text-gray-400" size={18} />
                     )}
                     <span className="text-sm">
-                      Freelancer {workspace.freelancer_marked_complete ? 'confirmed completion' : 'pending'}
+                      Freelancer{' '}
+                      {workspace.freelancer_marked_complete
+                        ? 'confirmed completion'
+                        : 'pending'}
                     </span>
                   </div>
                 </div>
@@ -512,8 +577,24 @@ export default function WorkspaceDetail({ user }) {
                 </button>
               </div>
             )}
+
+            {/* ✅ NEW: Review button moves here – only after BOTH confirm completion */}
+            {showReviewButton && (
+              <div className="mt-6 flex justify-end">
+                <Link
+                  to={`/contracts/${contractMeta.id}/review`}
+                  className="inline-flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition text-sm"
+                >
+                  {reviewButtonLabel}
+                </Link>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Tabs */}
+        {/* ... REST OF FILE UNCHANGED ... */}
+        {/* (Keep all existing tabs, modals, TaskCard, etc. exactly as they were) */}
 
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-md p-4 mb-6">
@@ -550,7 +631,6 @@ export default function WorkspaceDetail({ user }) {
             </button>
           </div>
         </div>
-
         {/* Tasks Tab */}
         {activeTab === 'tasks' && (
           <div className="space-y-6">

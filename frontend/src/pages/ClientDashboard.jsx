@@ -1,29 +1,74 @@
-// frontend/src/pages/ClientDashboard.jsx
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Briefcase,
   FileText,
-  CheckCircle,
   Users,
   IndianRupee,
   Clock,
   MapPin,
   Award,
-  Layers
+  Layers,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
+  Target,
+  Star,
+  MessageCircle,
+  ArrowRight,
+  Zap,
+  Shield
 } from 'lucide-react';
 
-import DashboardCard from '../components/DashboardCard';
+import Card from '../components/Card';
 import { projectsAPI } from '../api/projects';
 import { jobsAPI } from '../api/jobs';
 import { jobApplicationsAPI } from '../api/jobApplications';
+
+const DashboardCard = ({ title, value, icon: Icon, color, isCurrency, subtitle, trend }) => {
+  const colorClasses = {
+    purple: 'bg-purple-100 text-purple-600',
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-green-100 text-green-600',
+    orange: 'bg-orange-100 text-orange-600',
+    indigo: 'bg-indigo-100 text-indigo-600',
+  };
+  
+  return (
+    <div className="bg-white rounded-xl shadow-md p-4 sm:p-5 hover:shadow-lg transition-all duration-200 border border-gray-100">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <p className="text-xs sm:text-sm text-gray-600 font-medium mb-1">{title}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+            {isCurrency ? `₹${Number(value || 0).toLocaleString('en-IN')}` : value}
+          </p>
+          {subtitle && (
+            <p className="text-xs text-gray-500">{subtitle}</p>
+          )}
+        </div>
+        <div className={`p-2.5 sm:p-3 rounded-xl ${colorClasses[color]} flex-shrink-0`}>
+          <Icon size={20} className="sm:w-[24px] sm:h-[24px]" />
+        </div>
+      </div>
+      {trend && (
+        <div className="flex items-center gap-1 text-xs">
+          <TrendingUp size={12} className="text-green-500" />
+          <span className="text-green-600 font-medium">{trend}</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function ClientDashboard({ user }) {
   const [stats, setStats] = useState({
     totalProjects: 0,
     activeProjects: 0,
-    totalProposals: 0,
     completedProjects: 0,
+    totalJobs: 0,
+    activeJobs: 0,
+    completedJobs: 0,
+    totalProposals: 0,
   });
 
   const [projects, setProjects] = useState([]);
@@ -36,7 +81,6 @@ export default function ClientDashboard({ user }) {
     loadDashboardData();
   }, []);
 
-  // ✅ FINAL UPDATED FUNCTION
   const loadDashboardData = async () => {
     try {
       // PROJECTS
@@ -45,7 +89,6 @@ export default function ClientDashboard({ user }) {
       const myProjects = allProjects.filter((p) => p.client === user.id);
       setProjects(myProjects);
 
-      // ✅ Project proposal count
       const projectProposalCount = myProjects.reduce(
         (sum, p) => sum + (p.proposal_count || 0),
         0
@@ -57,7 +100,6 @@ export default function ClientDashboard({ user }) {
       const myJobs = allJobs.filter((j) => j.client === user.id);
       setJobs(myJobs);
 
-      // ✅ Job application count
       let jobApplicationCount = 0;
       const counts = {};
 
@@ -65,9 +107,8 @@ export default function ClientDashboard({ user }) {
         try {
           const appsResponse = await jobApplicationsAPI.list({ job: job.id });
           const count = appsResponse.data.results?.length || 0;
-
           counts[job.id] = count;
-          jobApplicationCount += count; // add to total
+          jobApplicationCount += count;
         } catch {
           counts[job.id] = 0;
         }
@@ -75,9 +116,8 @@ export default function ClientDashboard({ user }) {
 
       setApplicationCounts(counts);
 
-      // ✅ Final combined total
       const totalProposals = projectProposalCount + jobApplicationCount;
-      // ✅ Project-only counts
+
       const activeProjectCount = myProjects.filter((p) =>
         ['open', 'in_progress'].includes(p.status)
       ).length;
@@ -85,7 +125,6 @@ export default function ClientDashboard({ user }) {
         (p) => p.status === 'completed'
       ).length;
 
-      // ✅ Job-only counts
       const activeJobCount = myJobs.filter((j) =>
         ['open', 'in_progress'].includes(j.status)
       ).length;
@@ -94,20 +133,14 @@ export default function ClientDashboard({ user }) {
       ).length;
 
       setStats({
-        // Projects only
         totalProjects: myProjects.length,
         activeProjects: activeProjectCount,
         completedProjects: completedProjectCount,
-
-        // Jobs only (for separate cards / UI)
         totalJobs: myJobs.length,
         activeJobs: activeJobCount,
         completedJobs: completedJobCount,
-
-        // Proposals from both
         totalProposals: totalProposals,
       });
-
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     }
@@ -136,306 +169,455 @@ export default function ClientDashboard({ user }) {
     }
   };
 
+  const totalOpenWork = (stats.activeProjects || 0) + (stats.activeJobs || 0);
+  const totalCompleted = (stats.completedProjects || 0) + (stats.completedJobs || 0);
+  const isVerified = user?.client_profile?.is_verified;
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
       <div className="container mx-auto px-4">
 
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold">Client Dashboard</h1>
-          <div className="flex gap-3">
-            <button onClick={handleCreateJob} className="px-6 py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700">+ Post New Job</button>
-            <button onClick={handleCreateProject} className="px-6 py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700">+ Post New Project</button>
+        {/* PERSONALIZED WELCOME HEADER */}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+                Welcome back, {user?.first_name || 'Client'}! 👋
+              </h1>
+              <p className="text-sm sm:text-base text-gray-600">
+                Here's what's happening with your projects and jobs
+              </p>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <button
+                onClick={handleCreateJob}
+                className="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 font-semibold text-sm sm:text-base transition flex items-center justify-center gap-2"
+              >
+                <Briefcase size={18} />
+                Post New Job
+              </button>
+              <button
+                onClick={handleCreateProject}
+                className="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 font-semibold text-sm sm:text-base transition flex items-center justify-center gap-2"
+              >
+                <Layers size={18} />
+                Post New Project
+              </button>
+            </div>
           </div>
+
+          {/* Verification Status Banner */}
+          {!isVerified && (
+            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-4 sm:p-5 shadow-md">
+              <div className="flex items-start gap-3">
+                <div className="bg-yellow-100 p-2 rounded-lg flex-shrink-0">
+                  <Shield className="text-yellow-600" size={24} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-yellow-900 mb-1 text-base sm:text-lg">
+                    Get Verified to Build Trust
+                  </h3>
+                  <p className="text-sm text-yellow-800 mb-3">
+                    Verified clients get 3x more quality proposals and attract top-rated freelancers
+                  </p>
+                  <Link
+                    to="/profile"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold text-sm shadow-md transition"
+                  >
+                    <CheckCircle size={16} />
+                    Complete Verification
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* STATS */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
+        {/* KEY STATS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6 sm:mb-8">
           <DashboardCard
-            title="Total Projects"
-            value={stats.totalProjects}
+            title="Total Work Posted"
+            value={(stats.totalProjects || 0) + (stats.totalJobs || 0)}
             icon={Layers}
             color="purple"
+            subtitle={`${stats.totalProjects} projects • ${stats.totalJobs} jobs`}
           />
           <DashboardCard
-            title="Active Projects"
-            value={stats.activeProjects}
-            icon={FileText}
+            title="Active Work"
+            value={totalOpenWork}
+            icon={Zap}
             color="blue"
+            subtitle="Currently in progress"
           />
           <DashboardCard
-            title="Jobs Posted"
-            value={stats.totalJobs}
-            icon={Briefcase}
-            color="orange"
-          />
-          <DashboardCard
-            title="Proposals Received"
-            value={stats.totalProposals}
+            title="Total Proposals"
+            value={stats.totalProposals || 0}
             icon={Users}
+            color="orange"
+            subtitle="Across all your projects and jobs"
+          />
+          <DashboardCard
+            title="Completed"
+            value={totalCompleted}
+            icon={CheckCircle}
             color="green"
+            subtitle="Successfully finished"
           />
         </div>
-        {/* Your Activity summary */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Your Activity</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            {/* Completed Projects */}
-            <div className="border rounded-lg p-4 flex flex-col gap-1">
-              <span className="text-gray-500">Completed Projects</span>
-              <span className="text-2xl font-bold text-green-600">
-                {stats.completedProjects}
-              </span>
-              <span className="text-xs text-gray-500">
-                Projects marked as completed via contracts
-              </span>
-            </div>
 
-            {/* Active Projects */}
-            <div className="border rounded-lg p-4 flex flex-col gap-1">
-              <span className="text-gray-500">Active Projects</span>
-              <span className="text-2xl font-bold text-blue-600">
-                {stats.activeProjects}
-              </span>
-              <span className="text-xs text-gray-500">
-                Open or in-progress projects
-              </span>
-            </div>
-
-            {/* Completed Jobs */}
-            <div className="border rounded-lg p-4 flex flex-col gap-1">
-              <span className="text-gray-500">Completed Jobs</span>
-              <span className="text-2xl font-bold text-green-700">
-                {stats.completedJobs}
-              </span>
-              <span className="text-xs text-gray-500">
-                Jobs completed via contracts
-              </span>
-            </div>
-
-            {/* Active Jobs */}
-            <div className="border rounded-lg p-4 flex flex-col gap-1">
-              <span className="text-gray-500">Active Jobs</span>
-              <span className="text-2xl font-bold text-indigo-600">
-                {stats.activeJobs}
-              </span>
-              <span className="text-xs text-gray-500">
-                Currently open or in-progress jobs
-              </span>
-            </div>
+        {/* DETAILED STATS OVERVIEW */}
+        <Card className="mb-6 sm:mb-8">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Target className="text-purple-600" size={22} />
+              Detailed Overview
+            </h2>
+            <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100 font-medium">
+              <CheckCircle size={14} />
+              At a glance
+            </span>
           </div>
-        </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+            {/* Projects Breakdown */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-purple-50 to-white">
+              <div className="flex items-center gap-2 mb-3">
+                <Layers size={18} className="text-purple-600" />
+                <h3 className="font-semibold text-gray-900">Projects</h3>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Posted:</span>
+                  <span className="font-bold text-gray-900">{stats.totalProjects}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Active:</span>
+                  <span className="font-bold text-blue-600">{stats.activeProjects}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Completed:</span>
+                  <span className="font-bold text-green-600">{stats.completedProjects}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Jobs Breakdown */}
+            <div className="border border-gray-200 rounded-lg p-4 bg-gradient-to-br from-indigo-50 to-white">
+              <div className="flex items-center gap-2 mb-3">
+                <Briefcase size={18} className="text-indigo-600" />
+                <h3 className="font-semibold text-gray-900">Jobs</h3>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Posted:</span>
+                  <span className="font-bold text-gray-900">{stats.totalJobs}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Active:</span>
+                  <span className="font-bold text-blue-600">{stats.activeJobs}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Completed:</span>
+                  <span className="font-bold text-green-600">{stats.completedJobs}</span>
+                </div>
+              </div>
+            </div>
 
 
-        {/* MAIN WRAPPER */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+          </div>
+        </Card>
 
-          {/* TABS */}
-          <div className="flex justify-between mb-6 border-b pb-4">
-            <h2 className="text-2xl font-semibold">Your Postings</h2>
-
-            <div className="flex gap-3">
+        {/* TABS FOR PROJECTS & JOBS */}
+        <div className="bg-white rounded-xl shadow-md overflow-hidden">
+          {/* Tab Headers */}
+          <div className="border-b border-gray-200 bg-gray-50">
+            <div className="flex gap-2 sm:gap-4 px-4 sm:px-6">
               <button
                 onClick={() => setActiveTab('projects')}
-                className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 ${activeTab === 'projects' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 font-semibold text-sm sm:text-base transition-all ${
+                  activeTab === 'projects'
+                    ? 'text-purple-600 border-b-3 border-purple-600 bg-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
               >
-                <Layers size={16} />
-                Projects ({projects.length})
+                <Layers size={18} />
+                <span>Projects ({stats.totalProjects})</span>
               </button>
-
               <button
                 onClick={() => setActiveTab('jobs')}
-                className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 ${activeTab === 'jobs' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                className={`flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 font-semibold text-sm sm:text-base transition-all ${
+                  activeTab === 'jobs'
+                    ? 'text-indigo-600 border-b-3 border-indigo-600 bg-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
               >
-                <Briefcase size={16} />
-                Jobs ({jobs.length})
+                <Briefcase size={18} />
+                <span>Jobs ({stats.totalJobs})</span>
               </button>
             </div>
           </div>
 
-          {/* PROJECTS VIEW */}
-          {activeTab === 'projects' ? (
-            projects.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                {projects.map((project) => (
-                  <Link key={project.id} to={`/projects/${project.id}`} className="block border-2 border-gray-200 rounded-xl p-5 hover:border-purple-400 hover:shadow-lg">
-
-                    {/* Header */}
-                    <div className="flex justify-between mb-3">
-                      <h3 className="font-bold text-lg line-clamp-2">{project.title}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(project.status)}`}>
-                        {project.status.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </div>
-
-                    {/* Category */}
-                    {project.category && (
-                      <div className="mb-3">
-                        <span className="px-2.5 py-1 bg-blue-50 text-blue-700 text-xs rounded-full">{project.category}</span>
-                      </div>
-                    )}
-
-                    {/* Description */}
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{project.description}</p>
-
-                    {/* Skills */}
-                    {project.skills_required?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        {project.skills_required.slice(0, 3).map((skill) => (
-                          <span key={skill.id} className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">{skill.name}</span>
-                        ))}
-                        {project.skills_required.length > 3 && (
-                          <span className="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">+{project.skills_required.length - 3} more</span>
-                        )}
-                      </div>
-                    )}
-
-                    {/* INFO BOX */}
-                    <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg">
-
-                      {/* Budget */}
-                      <div className="flex justify-between text-sm">
-                        <div className="flex items-center gap-1.5 text-gray-600">
-                          <IndianRupee size={14} />
-                          Budget:
-                        </div>
-                        <span className="font-bold">{formatBudget(project)}</span>
-                      </div>
-
-                      {/* Level */}
-                      {project.experience_level && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-gray-600"><Award size={14} /> Level:</div>
-                          <span className="font-semibold capitalize">{project.experience_level}</span>
-                        </div>
-                      )}
-
-                      {/* Location */}
-                      {project.location_type && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-gray-600"><MapPin size={14} /> Type:</div>
-                          <span className="font-semibold capitalize">{project.location_type}</span>
-                        </div>
-                      )}
-
-                      {/* Duration */}
-                      {project.duration && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-gray-600"><Clock size={14} /> Duration:</div>
-                          <span className="font-semibold">
-                            {project.duration.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                          </span>
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* FOOTER */}
-                    <div className="flex justify-between border-t pt-3 text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <Users size={14} />
-                        <span className="font-semibold">{project.proposal_count || 0}</span>
-                        proposals
-                      </div>
-                      <span className="text-xs text-gray-500">
-                        {new Date(project.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                  </Link>
-                ))}
-
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-600 mb-4">You haven't posted any projects yet.</p>
-                <button onClick={handleCreateProject} className="px-6 py-2 bg-purple-600 text-white rounded-lg">Post Your First Project</button>
-              </div>
-            )
-          ) : (
-            /* JOBS VIEW */
-            jobs.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                {jobs.map((job) => (
-                  <Link key={job.id} to={`/jobs/${job.id}`} className="block border-2 border-gray-200 rounded-xl p-5 hover:border-purple-400 hover:shadow-lg">
-
-                    {/* Header */}
-                    <div className="flex justify-between mb-3">
-                      <h3 className="font-bold text-lg line-clamp-2">{job.title}</h3>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(job.status)}`}>
-                        {job.status.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </div>
-
-                    {/* Type */}
-                    <div className="mb-3">
-                      <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full capitalize">
-                        {job.job_type === 'hourly' ? 'Hourly' : 'Fixed Price'}
-                      </span>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
-
-                    {/* INFO BOX */}
-                    <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg">
-
-                      {/* Payment */}
-                      <div className="flex justify-between text-sm">
-                        <div className="flex gap-1.5 items-center text-gray-600"><IndianRupee size={14} /> Payment:</div>
-                        <span className="font-bold text-green-600">
-                          {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
-                            ? `₹${job.hourly_min}-${job.hourly_max}/hr`
-                            : job.job_type === 'fixed' && job.fixed_amount
-                            ? `₹${job.fixed_amount}`
-                            : 'Not specified'}
+          {/* Tab Content */}
+          <div className="p-4 sm:p-6">
+            {activeTab === 'projects' ? (
+              // PROJECTS VIEW
+              projects.length > 0 ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {projects.map((project) => (
+                    <Link
+                      key={project.id}
+                      to={`/projects/${project.id}`}
+                      className="block border-2 border-gray-200 rounded-xl p-4 sm:p-5 hover:border-purple-400 hover:shadow-lg transition-all group"
+                    >
+                      {/* Header */}
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-bold text-base sm:text-lg line-clamp-2 group-hover:text-purple-600 transition flex-1">
+                          {project.title}
+                        </h3>
+                        <span
+                          className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-bold border ml-2 flex-shrink-0 ${getStatusColor(
+                            project.status
+                          )}`}
+                        >
+                          {project.status.replace('_', ' ').toUpperCase()}
                         </span>
                       </div>
 
-                      {/* Level */}
-                      {job.experience_level && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-gray-600"><Award size={14} /> Level:</div>
-                          <span className="font-semibold capitalize">{job.experience_level}</span>
+                      {/* Description */}
+                      <p className="text-xs sm:text-sm text-gray-600 mb-4 line-clamp-2">
+                        {project.description}
+                      </p>
+
+                      {/* Skills */}
+                      {project.skills_required && project.skills_required.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {project.skills_required.slice(0, 3).map((skill, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 sm:px-2.5 py-1 bg-purple-50 text-purple-700 text-xs rounded-full border border-purple-100"
+                            >
+                              {typeof skill === 'string' ? skill : skill.name || skill}
+                            </span>
+                          ))}
+                          {project.skills_required.length > 3 && (
+                            <span className="px-2 sm:px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                              +{project.skills_required.length - 3}
+                            </span>
+                          )}
                         </div>
                       )}
 
-                      {/* Location */}
-                      {job.location_type && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-gray-600"><MapPin size={14} /> Type:</div>
-                          <span className="font-semibold capitalize">{job.location_type}</span>
+                      {/* Info Box */}
+                      <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg text-xs sm:text-sm">
+                        <div className="flex justify-between">
+                          <div className="flex items-center gap-1.5 text-gray-600">
+                            <IndianRupee size={14} />
+                            Budget:
+                          </div>
+                          <span className="font-bold">{formatBudget(project)}</span>
                         </div>
-                      )}
-
-                    </div>
-
-                    {/* FOOTER */}
-                    <div className="flex justify-between pt-3 border-t text-sm">
-                      <div className="flex items-center gap-1.5">
-                        <Users size={14} />
-                        <span className="font-semibold text-purple-700">{applicationCounts[job.id] || 0}</span>
-                        application{(applicationCounts[job.id] || 0) !== 1 ? 's' : ''}
+                        {project.experience_level && (
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <Award size={14} /> Level:
+                            </div>
+                            <span className="font-semibold capitalize">{project.experience_level}</span>
+                          </div>
+                        )}
+                        {project.location_type && (
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <MapPin size={14} /> Type:
+                            </div>
+                            <span className="font-semibold capitalize">{project.location_type}</span>
+                          </div>
+                        )}
+                        {project.duration && (
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <Clock size={14} /> Duration:
+                            </div>
+                            <span className="font-semibold">
+                              {project.duration.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-xs text-gray-500">{new Date(job.created_at).toLocaleDateString()}</span>
-                    </div>
 
-                  </Link>
-                ))}
-
-              </div>
+                      {/* Footer */}
+                      <div className="flex justify-between items-center border-t pt-3 text-xs sm:text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <Users size={14} className="text-purple-600" />
+                          <span className="font-semibold text-purple-700">
+                            {project.proposal_count || 0}
+                          </span>
+                          <span className="text-gray-600">proposals</span>
+                        </div>
+                        <ArrowRight size={16} className="text-gray-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 sm:py-16">
+                  <Layers size={48} className="mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                    No projects posted yet
+                  </h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto">
+                    Start your journey by posting your first project and connect with talented freelancers
+                  </p>
+                  <button
+                    onClick={handleCreateProject}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold shadow-md transition"
+                  >
+                    <Layers size={18} />
+                    Post Your First Project
+                  </button>
+                </div>
+              )
             ) : (
-              <div className="text-center py-12">
-                <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-600 mb-4">You haven't posted any jobs yet.</p>
-                <button onClick={handleCreateJob} className="px-6 py-2 bg-indigo-600 text-white rounded-lg">Post Your First Job</button>
-              </div>
-            )
-          )}
+              // JOBS VIEW
+              jobs.length > 0 ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {jobs.map((job) => (
+                    <Link
+                      key={job.id}
+                      to={`/jobs/${job.id}`}
+                      className="block border-2 border-gray-200 rounded-xl p-4 sm:p-5 hover:border-indigo-400 hover:shadow-lg transition-all group"
+                    >
+                      {/* Header */}
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-bold text-base sm:text-lg line-clamp-2 group-hover:text-indigo-600 transition flex-1">
+                          {job.title}
+                        </h3>
+                        <span
+                          className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-bold border ml-2 flex-shrink-0 ${getStatusColor(
+                            job.status
+                          )}`}
+                        >
+                          {job.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                      </div>
 
+                      {/* Type Badge */}
+                      <div className="mb-3">
+                        <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-full capitalize font-medium">
+                          {job.job_type === 'hourly' ? 'Hourly' : 'Fixed Price'}
+                        </span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-xs sm:text-sm text-gray-600 mb-4 line-clamp-2">
+                        {job.description}
+                      </p>
+
+                      {/* Info Box */}
+                      <div className="space-y-2 mb-4 bg-gray-50 p-3 rounded-lg text-xs sm:text-sm">
+                        <div className="flex justify-between">
+                          <div className="flex gap-1.5 items-center text-gray-600">
+                            <IndianRupee size={14} /> Payment:
+                          </div>
+                          <span className="font-bold text-green-600">
+                            {job.job_type === 'hourly' && job.hourly_min && job.hourly_max
+                              ? `₹${job.hourly_min}-${job.hourly_max}/hr`
+                              : job.job_type === 'fixed' && job.fixed_amount
+                              ? `₹${job.fixed_amount}`
+                              : 'Not specified'}
+                          </span>
+                        </div>
+                        {job.experience_level && (
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <Award size={14} /> Level:
+                            </div>
+                            <span className="font-semibold capitalize">{job.experience_level}</span>
+                          </div>
+                        )}
+                        {job.location_type && (
+                          <div className="flex justify-between">
+                            <div className="flex items-center gap-1.5 text-gray-600">
+                              <MapPin size={14} /> Type:
+                            </div>
+                            <span className="font-semibold capitalize">{job.location_type}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex justify-between items-center pt-3 border-t text-xs sm:text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <Users size={14} className="text-indigo-600" />
+                          <span className="font-semibold text-indigo-700">
+                            {applicationCounts[job.id] || 0}
+                          </span>
+                          <span className="text-gray-600">
+                            application{(applicationCounts[job.id] || 0) !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <ArrowRight size={16} className="text-gray-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 sm:py-16">
+                  <Briefcase size={48} className="mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                    No jobs posted yet
+                  </h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-6 max-w-md mx-auto">
+                    Post your first job listing and start receiving applications from qualified candidates
+                  </p>
+                  <button
+                    onClick={handleCreateJob}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold shadow-md transition"
+                  >
+                    <Briefcase size={18} />
+                    Post Your First Job
+                  </button>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* SUCCESS TIPS SECTION */}
+        <div className="mt-6 sm:mt-8 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-5 sm:p-6 shadow-md">
+          <h3 className="font-bold text-purple-900 mb-4 text-base sm:text-lg flex items-center gap-2">
+            <Target className="text-purple-600" size={20} />
+            Tips to Attract Top Talent
+          </h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="text-purple-600" size={18} />
+                <p className="font-semibold text-sm text-purple-900">Clear Descriptions</p>
+              </div>
+              <p className="text-xs text-purple-700">Detailed project briefs get 2x more proposals</p>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <IndianRupee className="text-purple-600" size={18} />
+                <p className="font-semibold text-sm text-purple-900">Fair Budgets</p>
+              </div>
+              <p className="text-xs text-purple-700">Market-rate budgets attract quality freelancers</p>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <MessageCircle className="text-purple-600" size={18} />
+                <p className="font-semibold text-sm text-purple-900">Quick Responses</p>
+              </div>
+              <p className="text-xs text-purple-700">Reply within 24 hours to keep freelancers engaged</p>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Star className="text-purple-600" size={18} />
+                <p className="font-semibold text-sm text-purple-900">Leave Reviews</p>
+              </div>
+              <p className="text-xs text-purple-700">Build reputation and attract better talent</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

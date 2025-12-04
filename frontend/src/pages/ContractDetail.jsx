@@ -8,7 +8,11 @@ import {
   User,
   Calendar,
   IndianRupee,
-  ArrowLeft
+  ArrowLeft,
+  Paperclip,
+  Edit2,
+  X,
+  Save
 } from 'lucide-react';
 import { contractsAPI } from '../api/contracts';
 
@@ -21,6 +25,12 @@ export default function ContractDetail({ user }) {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [showReviewSuccess, setShowReviewSuccess] = useState(location.state?.reviewSubmitted || false);
+
+  // ✅ new local editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTerms, setEditTerms] = useState('');
+  const [editPaymentTerms, setEditPaymentTerms] = useState('');
+  const [editFile, setEditFile] = useState(null);
 
   useEffect(() => {
     loadContract();
@@ -44,6 +54,10 @@ export default function ContractDetail({ user }) {
       setLoading(true);
       const res = await contractsAPI.get(id);
       setContract(res.data);
+      // sync edit fields with latest contract
+      setEditTerms(res.data.terms || '');
+      setEditPaymentTerms(res.data.payment_terms || '');
+      setEditFile(null);
     } catch (err) {
       setError('Failed to load contract details');
       console.error(err);
@@ -66,20 +80,42 @@ export default function ContractDetail({ user }) {
     }
   };
 
-  const handleCompleteContract = async () => {
-    if (!window.confirm('Are you sure you want to mark this contract as completed?')) return;
-
+  // ✅ NEW: save client edits (terms, payment_terms, attachment)
+  const handleSaveEdits = async () => {
     try {
       setActionLoading(true);
-      await contractsAPI.complete(id);
-      await loadContract();
-      alert('Contract marked as completed!');
+      const formData = new FormData();
+      formData.append('terms', editTerms || '');
+      formData.append('payment_terms', editPaymentTerms || '');
+      if (editFile) {
+        formData.append('attachment', editFile);
+      }
+
+      const res = await contractsAPI.update(id, formData);
+      setContract(res.data);
+      setIsEditing(false);
+      setEditTerms(res.data.terms || '');
+      setEditPaymentTerms(res.data.payment_terms || '');
+      setEditFile(null);
+      alert('Contract updated successfully.');
     } catch (err) {
-      alert('Failed to complete contract');
       console.error(err);
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.non_field_errors?.[0] ||
+        'Failed to update contract.';
+      alert(msg);
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    if (!contract) return;
+    setIsEditing(false);
+    setEditTerms(contract.terms || '');
+    setEditPaymentTerms(contract.payment_terms || '');
+    setEditFile(null);
   };
 
   if (loading) {
@@ -117,13 +153,23 @@ export default function ContractDetail({ user }) {
     ((user.role === 'client' && !contract.client_signed) ||
       (user.role === 'freelancer' && !contract.freelancer_signed));
 
-  const canComplete = contract.status === 'active' && user.role === 'client';
+  // ❌ removed: mark-as-completed from this page (handled in Workspace now)
+  // const canComplete = contract.status === 'active' && user.role === 'client';
+
   const canClientReview = user?.role === 'client' && contract.client_can_review && user.id === contract.client;
   const canFreelancerReview =
     user?.role === 'freelancer' && contract.freelancer_can_review && user.id === contract.freelancer;
   const showReviewButton = canClientReview || canFreelancerReview;
   const reviewButtonLabel =
     user?.role === 'client' ? 'Review Freelancer' : user?.role === 'freelancer' ? 'Review Client' : 'Leave Review';
+
+  // ✅ client can edit only while pending and before any signatures
+  const canClientEdit =
+    user?.role === 'client' &&
+    contract.client === user?.id &&
+    contract.status === 'pending' &&
+    !contract.client_signed &&
+    !contract.freelancer_signed;
 
   // ✅ Unified title for both job and project contracts
   const title = contract.job_title || contract.project_title || `Contract #${contract.id}`;
@@ -153,6 +199,11 @@ export default function ContractDetail({ user }) {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{title}</h1>
               <p className="text-gray-600">Contract ID: #{contract.id}</p>
+              {canClientEdit && (
+                <p className="mt-2 text-xs text-gray-500">
+                  You can edit terms and upload an attachment until either party signs this contract.
+                </p>
+              )}
             </div>
             <span
               className={`px-4 py-2 rounded-full text-sm font-semibold ${
@@ -221,7 +272,7 @@ export default function ContractDetail({ user }) {
                 <Calendar size={20} />
                 Timeline
               </h3>
-              <div className="flex gap-6 text-sm">
+              <div className="flex gap-6 text-sm flex-wrap">
                 <div>
                   <p className="text-gray-600">Start Date</p>
                   <p className="font-medium text-gray-900">
@@ -246,72 +297,176 @@ export default function ContractDetail({ user }) {
             </div>
           )}
 
-          {/* Terms */}
+          {/* Terms + Edit controls */}
           <div className="mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <FileText size={20} />
-              Contract Terms
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <FileText size={20} />
+                Contract Terms
+              </h3>
+              {canClientEdit && (
+                <button
+                  type="button"
+                  onClick={() => (isEditing ? handleCancelEdit() : setIsEditing(true))}
+                  className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  {isEditing ? (
+                    <>
+                      <X size={14} />
+                      Cancel edit
+                    </>
+                  ) : (
+                    <>
+                      <Edit2 size={14} />
+                      Edit terms
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-gray-700 whitespace-pre-wrap">{contract.terms}</p>
+              {isEditing ? (
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white"
+                  rows={6}
+                  value={editTerms}
+                  onChange={(e) => setEditTerms(e.target.value)}
+                  placeholder="Describe the full scope of work, responsibilities, and deliverables..."
+                />
+              ) : (
+                <p className="text-gray-700 whitespace-pre-wrap">
+                  {contract.terms || 'No terms have been added yet.'}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Payment Terms */}
-          {contract.payment_terms && (
+          {(isEditing || contract.payment_terms) && (
             <div className="mb-6">
               <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                 <IndianRupee size={20} />
                 Payment Terms
               </h3>
               <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-gray-700 whitespace-pre-wrap">{contract.payment_terms}</p>
+                {isEditing ? (
+                  <textarea
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white"
+                    rows={4}
+                    value={editPaymentTerms}
+                    onChange={(e) => setEditPaymentTerms(e.target.value)}
+                    placeholder="Specify milestones, amounts, schedules, and any special payment conditions..."
+                  />
+                ) : (
+                  <p className="text-gray-700 whitespace-pre-wrap">
+                    {contract.payment_terms || 'No payment terms have been added yet.'}
+                  </p>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* Attachment section */}
+          <div className="mb-6">
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Paperclip size={20} />
+              Contract Attachment
+            </h3>
+
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+              {contract.attachment ? (
+                <a
+                  href={contract.attachment}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-purple-600 hover:text-purple-700 hover:underline"
+                >
+                  <Paperclip size={16} />
+                  <span>View / Download attached file</span>
+                </a>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  No attachment has been uploaded for this contract yet.
+                </p>
+              )}
+
+              {isEditing && (
+                <div className="pt-3 border-t border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Upload attachment (optional)
+                  </label>
+                  <input
+                    type="file"
+                    className="block w-full text-sm text-gray-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                    onChange={(e) => setEditFile(e.target.files?.[0] || null)}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    You can upload a single file (PDF, DOCX, image, etc.). Uploading a new file will replace the existing one.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Save / Cancel buttons for edit mode */}
+          {isEditing && (
+            <div className="flex flex-wrap gap-3 mb-6">
+              <button
+                type="button"
+                onClick={handleSaveEdits}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={18} />
+                {actionLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                <X size={18} />
+                Cancel
+              </button>
             </div>
           )}
 
           {/* Actions */}
           <div className="flex flex-col gap-4 pt-6 border-t">
             <div className="flex gap-4 flex-wrap">
-            {canSign && (
-              <button
-                onClick={handleSignContract}
-                disabled={actionLoading}
-                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CheckCircle size={20} />
-                {actionLoading ? 'Signing...' : 'Sign Contract'}
-              </button>
-            )}
+              {canSign && (
+                <button
+                  onClick={handleSignContract}
+                  disabled={actionLoading}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle size={20} />
+                  {actionLoading ? 'Signing...' : 'Sign Contract'}
+                </button>
+              )}
 
-            {canComplete && (
-              <button
-                onClick={handleCompleteContract}
-                disabled={actionLoading}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CheckCircle size={20} />
-                {actionLoading ? 'Processing...' : 'Mark as Completed'}
-              </button>
-            )}
+              {/* ❌ removed Mark as Completed button from here; completion handled in Workspace */}
 
-            {contract.status === 'completed' && (
-              <div className="flex items-center gap-2 text-green-700">
-                <CheckCircle size={24} />
-                <span className="font-semibold">This contract has been completed</span>
-              </div>
-            )}
-\n            {/* Workspace Link for Active Contracts */}
-            {contract.status === 'active' && (
-              <Link
-                to={`/workspace`}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
-              >
-                <FileText size={20} />
-                Go to Workspace
-              </Link>
-            )}
-          </div>
+              {contract.status === 'completed' && (
+                <div className="flex items-center gap-2 text-green-700">
+                  <CheckCircle size={24} />
+                  <span className="font-semibold">This contract has been completed</span>
+                </div>
+              )}
+
+              {/* Workspace Link for Active Contracts (unchanged logic) */}
+              {contract.status === 'active' && (
+                <Link
+                  to={`/workspace`}
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
+                >
+                  <FileText size={20} />
+                  Go to Workspace
+                </Link>
+              )}
+            </div>
 
             {showReviewButton && (
               <Link

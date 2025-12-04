@@ -22,7 +22,6 @@ class JobAttachmentSerializer(serializers.ModelSerializer):
 class JobSerializer(serializers.ModelSerializer):
     """
     Accept file uploads under 'attachments' key (max 2).
-    This keeps semantics distinct from Project.
     """
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
     file_attachments = JobAttachmentSerializer(source='attachments', many=True, read_only=True)
@@ -40,7 +39,6 @@ class JobSerializer(serializers.ModelSerializer):
         read_only_fields = ['client', 'created_at', 'updated_at', 'status']
 
     def validate(self, attrs):
-        """Validate that appropriate fields are provided based on job_type"""
         job_type = attrs.get('job_type', getattr(self.instance, 'job_type', 'hourly'))
 
         if job_type == 'hourly':
@@ -65,18 +63,16 @@ class JobSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-
         job = Job.objects.create(**validated_data)
 
         files = request.FILES.getlist('attachments') if request else []
-        for f in files[:2]:  # Max 2 files
+        for f in files[:2]:
             JobAttachment.objects.create(
                 job=job,
                 file=f,
                 original_name=getattr(f, 'name', ''),
                 size=getattr(f, 'size', 0)
             )
-
         return job
 
     def update(self, instance, validated_data):
@@ -87,14 +83,13 @@ class JobSerializer(serializers.ModelSerializer):
         instance.save()
 
         files = request.FILES.getlist('attachments') if request else []
-        for f in files[:2]:  
+        for f in files[:2]:
             JobAttachment.objects.create(
                 job=instance,
                 file=f,
                 original_name=getattr(f, 'name', ''),
                 size=getattr(f, 'size', 0)
             )
-
         return instance
 
 
@@ -132,6 +127,10 @@ class JobApplicationSerializer(serializers.ModelSerializer):
             'status', 'created_at', 'updated_at', 'file_attachments'
         ]
         read_only_fields = ['freelancer', 'created_at', 'updated_at']
+        extra_kwargs = {
+            # make estimated time optional so it can be omitted for ongoing roles
+            'estimated_time': {'required': False, 'allow_blank': True}
+        }
 
     def get_client_name(self, obj):
         try:
@@ -140,7 +139,6 @@ class JobApplicationSerializer(serializers.ModelSerializer):
             return 'Unknown'
 
     def get_freelancer(self, obj):
-        """Get freelancer details for application cards"""
         if not obj.freelancer:
             return None
 
@@ -152,5 +150,9 @@ class JobApplicationSerializer(serializers.ModelSerializer):
             'title': getattr(getattr(user, 'freelancer_profile', None), 'role_title', None),
             'location': getattr(user, 'location', None),
             'rating_avg': getattr(user, 'rating_avg', None),
-            'projects_completed': getattr(getattr(user, 'freelancer_profile', None), 'projects_completed', 0),
+            'projects_completed': getattr(
+                getattr(user, 'freelancer_profile', None),
+                'projects_completed',
+                0
+            ),
         }

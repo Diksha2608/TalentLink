@@ -32,7 +32,7 @@ def create_workspace_on_contract_update(sender, instance, created, **kwargs):
         
         # All conditions met - create workspace
         workspace = Workspace.objects.create(contract=instance)
-        logger.info(f"✅ Workspace created successfully for contract #{instance.id} (ID: {workspace.id})")
+        logger.info(f"âœ… Workspace created successfully for contract #{instance.id} (ID: {workspace.id})")
         
         # Send notification to both parties
         from notifications.models import Notification
@@ -66,4 +66,4 @@ def create_workspace_on_contract_update(sender, instance, created, **kwargs):
             )
         
     except Exception as e:
-        logger.error(f"❌ Error creating workspace for contract #{instance.id}: {str(e)}", exc_info=True)
+        logger.error(f"âŒ Error creating workspace for contract #{instance.id}: {str(e)}", exc_info=True)

@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import filters
+from rest_framework.exceptions import PermissionDenied, ValidationError  # ✅ NEW
 from .models import Contract, Review, ReviewResponse
 from .serializers import (
     ContractSerializer, 
@@ -38,6 +39,29 @@ class ContractViewSet(viewsets.ModelViewSet):
 
         print(f"[Contracts] User: {user.email}, Count: {queryset.count()}")
         return queryset
+
+    # ✅ NEW: centralised edit permission checks
+    def _check_edit_permissions(self, request, contract):
+        """
+        Only the client can edit contract terms/payment/attachment,
+        and only while the contract is still unsigned by both parties.
+        """
+        user = request.user
+        if user != contract.client:
+            raise PermissionDenied("Only the client can update contract terms.")
+        if contract.client_signed or contract.freelancer_signed:
+            raise ValidationError("Contract can no longer be edited after it has been signed.")
+
+    # ✅ apply checks for both PUT and PATCH
+    def update(self, request, *args, **kwargs):
+        contract = self.get_object()
+        self._check_edit_permissions(request, contract)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        contract = self.get_object()
+        self._check_edit_permissions(request, contract)
+        return super().partial_update(request, *args, **kwargs)
 
     # ============================================================
     # SIGN CONTRACT
@@ -351,20 +375,32 @@ class ReviewStatsView(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        verified_reviews = Review.objects.filter(reviewee=user, is_verified=True)
-        
+        # ✅ Only platform reviews contribute to main rating & distribution
+        platform_reviews = Review.objects.filter(
+            reviewee=user,
+            is_verified=True,
+            review_type='platform',
+        )
+
+        # ✅ Count external reviews separately (they're testimonials / marketing only)
+        external_reviews = Review.objects.filter(
+            reviewee=user,
+            is_verified=True,
+            review_type='external',
+        )
+
         stats = {
-            'total_reviews': verified_reviews.count(),
+            'total_reviews': platform_reviews.count(),
             'average_rating': user.rating_avg,
             'rating_distribution': {
-                '5': verified_reviews.filter(rating=5).count(),
-                '4': verified_reviews.filter(rating=4).count(),
-                '3': verified_reviews.filter(rating=3).count(),
-                '2': verified_reviews.filter(rating=2).count(),
-                '1': verified_reviews.filter(rating=1).count(),
+                '5': platform_reviews.filter(rating=5).count(),
+                '4': platform_reviews.filter(rating=4).count(),
+                '3': platform_reviews.filter(rating=3).count(),
+                '2': platform_reviews.filter(rating=2).count(),
+                '1': platform_reviews.filter(rating=1).count(),
             },
-            'platform_reviews': verified_reviews.filter(review_type='platform').count(),
-            'external_reviews': verified_reviews.filter(review_type='external').count(),
+            'platform_reviews': platform_reviews.count(),
+            'external_reviews': external_reviews.count(),
         }
 
         return Response(stats)

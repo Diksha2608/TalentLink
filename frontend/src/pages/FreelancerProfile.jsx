@@ -11,6 +11,7 @@ import ImageCropper from '../components/ImageCropper';
 import { authAPI } from '../api/auth';
 // import ReviewList from '../components/ReviewList';
 import RatingDisplay from '../components/RatingDisplay';
+import { calculateProfileCompletion } from '../api/profileCompletionUtils'
 
 export default function FreelancerProfile({ user, setUser }) {
   const [activeSection, setActiveSection] = useState('basic');
@@ -131,31 +132,34 @@ const loadProfile = async () => {
   const calculateCompletion = () => {
     const data = savedProfile || formData; // Use saved profile data
     
-    const checks = {
-      basic: !!(
-        data.first_name && 
-        data.last_name && 
-        data.bio && 
-        data.location && 
-        data.phone &&
-        user?.avatar  // Check user.avatar from backend
-      ),
-      professional: !!(
-        data.role_title && 
-        data.hourly_rate && 
-        data.skills?.length >= 3 &&
-        data.portfolio
-      ),
-      portfolio: portfolioFiles.length > 0,
-      experience: data.experiences?.length > 0,
-      education: data.education?.length > 0,
-      languages: data.languages?.length > 0,
-    };
-
-    const completed = Object.values(checks).filter(Boolean).length;
-    const total = Object.keys(checks).length;
+    // Use unified profile completion utility
+    const completion = calculateProfileCompletion(
+      { 
+        ...user,
+        // Include any unsaved changes
+        bio: data.bio,
+        location: data.location,
+        phone: data.phone,
+        avatar: avatarPreview || user?.avatar
+      }, 
+      {
+        ...freelancerProfile,
+        role_title: data.role_title,
+        hourly_rate: data.hourly_rate,
+        skills: data.skills,
+        portfolio: data.portfolio,
+        languages: data.languages,
+        experiences: data.experiences,
+        education: data.education,
+        social_links: data.social_links,
+        portfolio_files: portfolioFiles
+      }
+    );
     
-    return { checks, percentage: Math.round((completed / total) * 100) };
+    return { 
+      checks: completion.sectionChecks, 
+      percentage: completion.percentage 
+    };
   };
 
   const { checks, percentage } = calculateCompletion();

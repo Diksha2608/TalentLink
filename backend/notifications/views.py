@@ -35,3 +35,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
         notif.is_read = True
         notif.save()
         return Response({'status': 'ok'})
+    
+    # ✅ NEW: clear all notifications for current user
+    @action(detail=False, methods=['delete'], url_path='clear-all')
+    def clear_all(self, request):
+        self.get_queryset().delete()
+        return Response({'status': 'ok'})

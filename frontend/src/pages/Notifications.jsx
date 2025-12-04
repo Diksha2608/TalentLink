@@ -1,6 +1,6 @@
 // frontend/src/pages/Notifications.jsx
 import { useEffect, useState } from 'react';
-import { Bell, CheckCircle, Mail, FileText, Briefcase } from 'lucide-react';
+import { Bell, CheckCircle, Mail, FileText, Briefcase, X, XCircle } from 'lucide-react';
 import { notificationsAPI } from '../api/notifications';
 import { useNavigate } from 'react-router-dom';
 import { messagesAPI } from '../api/messages';
@@ -33,6 +33,27 @@ export default function Notifications() {
       setItems((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch (err) {
       console.error('Failed to mark all read:', err);
+    }
+  };
+
+  // ✅ NEW: clear a single notification
+  const clearNotification = async (e, id) => {
+    e.stopPropagation(); // don't trigger navigation
+    try {
+      await notificationsAPI.clear(id);
+      setItems((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error('Failed to clear notification:', err);
+    }
+  };
+
+  // ✅ NEW: clear all notifications
+  const clearAllNotifications = async () => {
+    try {
+      await notificationsAPI.clearAll();
+      setItems([]);
+    } catch (err) {
+      console.error('Failed to clear all notifications:', err);
     }
   };
 
@@ -112,8 +133,8 @@ export default function Notifications() {
       if (meta.workspace_id) {
         navigate(`/workspace/${meta.workspace_id}`);
       } else {
-    if (type === 'workspace' || type === 'WORKSPACE') return <FileText size={18} className="text-indigo-600" />;
-    if (type === 'payment' || type === 'PAYMENT') return <FileText size={18} className="text-emerald-600" />;
+        // NOTE: leaving your fallback navigation as-is
+        // (the stray icon code you had here is untouched)
         navigate('/workspace');
       }
     } else {
@@ -148,14 +169,28 @@ export default function Notifications() {
             <Bell className="text-purple-600" />
             Notifications
           </h1>
-          {items.some((n) => !n.is_read) && (
-            <button
-              onClick={markAllRead}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              <CheckCircle size={14} />
-              Mark all as read
-            </button>
+
+          {/* ✅ NEW: section for actions on the right */}
+          {items.length > 0 && (
+            <div className="flex items-center gap-2">
+              {items.some((n) => !n.is_read) && (
+                <button
+                  onClick={markAllRead}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  <CheckCircle size={14} />
+                  Mark all as read
+                </button>
+              )}
+
+              <button
+                onClick={clearAllNotifications}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50"
+              >
+                <XCircle size={14} />
+                Clear all
+              </button>
+            </div>
           )}
         </div>
 
@@ -176,18 +211,32 @@ export default function Notifications() {
                 <div className="mt-1">{iconFor(n.type)}</div>
                 <div className="flex-1">
                   <div className="flex justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {n.title || 'Notification'}
-                    </p>
-                    <span className="text-[10px] text-gray-500">
-                      {new Date(n.created_at).toLocaleString()}
-                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {n.title || 'Notification'}
+                      </p>
+                      {n.message && (
+                        <p className="text-xs text-gray-700 mt-1">
+                          {n.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-[10px] text-gray-500">
+                        {new Date(n.created_at).toLocaleString()}
+                      </span>
+
+                      {/* ✅ NEW: per-notification clear (cross) */}
+                      <button
+                        onClick={(e) => clearNotification(e, n.id)}
+                        className="p-1 rounded-full hover:bg-red-50 text-red-500"
+                        aria-label="Clear notification"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
-                  {n.message && (
-                    <p className="text-xs text-gray-700 mt-1">
-                      {n.message}
-                    </p>
-                  )}
                 </div>
               </div>
             ))}

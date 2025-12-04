@@ -87,7 +87,9 @@ function AppLayout({ user, setUser, loading }) {
   const location = useLocation();
 
 
-  const hideChrome = location.pathname === '/onboarding';
+  const hideChrome =
+    location.pathname === '/onboarding' ||
+    location.pathname === '/submit-review';
 
   return (
     <div className="flex flex-col min-h-screen">
