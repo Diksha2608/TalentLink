@@ -39,6 +39,20 @@ import ReviewsPage from './pages/ReviewsPage';
 import SavedItemsPage from './pages/SavedItemsPage';
 import Workspace from './pages/Workspace';
 import WorkspaceDetail from './pages/WorkspaceDetail';
+
+// 🔐 Forgot / Reset password pages
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+
+// Static pages
+import AboutUs from "./pages/AboutUs";
+import ContactUs from "./pages/ContactUs";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
+
+// ✅ Help Centre bot (teammate)
+import Help from "./pages/Help";
+
 import './App.css';
 
 function App() {
@@ -47,6 +61,17 @@ function App() {
     return cached ? JSON.parse(cached) : null;
   });
   const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('tl_theme');
+    const root = document.documentElement;
+
+    if (savedTheme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -78,14 +103,15 @@ function App() {
 
   return (
     <Router>
-      <AppLayout user={user} setUser={setUser} loading={loading} />
+      <div className="bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-slate-100 min-h-screen">
+        <AppLayout user={user} setUser={setUser} loading={loading} />
+      </div>
     </Router>
-  );
+);
 }
 
 function AppLayout({ user, setUser, loading }) {
   const location = useLocation();
-
 
   const hideChrome =
     location.pathname === '/onboarding' ||
@@ -102,6 +128,10 @@ function AppLayout({ user, setUser, loading }) {
           <Route path="/" element={<Landing user={user} />} />
           <Route path="/signup" element={<SignUp setUser={setUser} />} />
           <Route path="/signin" element={<SignIn setUser={setUser} />} />
+
+          {/* 🔐 Forgot & Reset Password (public) */}
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           <Route
             path="/onboarding"
@@ -139,16 +169,24 @@ function AppLayout({ user, setUser, loading }) {
           <Route path="/contracts" element={<Contracts user={user} />} />
           <Route path="/contracts/:id" element={<ContractDetail user={user} />} />
           <Route path="/contracts/:id/review" element={<ContractReview user={user} />} />
-          <Route path="/workspace" element={
-            <ProtectedRoute user={user}>
-              <Workspace user={user} />
-            </ProtectedRoute>
-          } />
-          <Route path="/workspace/:id" element={
-            <ProtectedRoute user={user}>
-              <WorkspaceDetail user={user} />
-            </ProtectedRoute>
-          } />
+
+          <Route
+            path="/workspace"
+            element={
+              <ProtectedRoute user={user}>
+                <Workspace user={user} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/:id"
+            element={
+              <ProtectedRoute user={user}>
+                <WorkspaceDetail user={user} />
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/dashboard/freelancer"
             element={
@@ -174,7 +212,6 @@ function AppLayout({ user, setUser, loading }) {
               </ProtectedRoute>
             }
           />
-
 
           <Route
             path="/notifications"
@@ -229,12 +266,20 @@ function AppLayout({ user, setUser, loading }) {
               </ProtectedRoute>
             }
           />
+
+          {/* Static / info pages */}
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/contact" element={<ContactUs />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="/terms" element={<TermsOfService />} />
+
           <Route path="/reviews" element={<ReviewsPage user={user} />} />
           <Route path="/saved" element={<SavedItemsPage />} />
           <Route path="/test-api" element={<TestAPI />} />
           <Route path="/jobs/create" element={<PostJob user={user} />} />
           <Route path="/jobs/:id" element={<JobDetail user={user} />} />
-          <Route path="/jobs/:id/edit" element={<EditJob user={user} />} />  
+          <Route path="/jobs/:id/edit" element={<EditJob user={user} />} />
           <Route path="/submit-review" element={<ExternalReviewForm />} />
           <Route
             path="/projects/create"

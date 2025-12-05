@@ -1,3 +1,6 @@
+# backend/notifications/signals.py
+# ADD THIS FUNCTION at the top (after imports, before any @receiver)
+
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
@@ -5,6 +8,12 @@ from messaging.models import Message
 from proposals.models import Proposal
 from contracts.models import Contract
 from notifications.models import Notification
+
+
+# ✅ ADD THIS HELPER FUNCTION
+def should_notify(user):
+    """Check if user has notifications enabled"""
+    return getattr(user, 'notifications_enabled', True)
 
 
 # ========== 1) MESSAGE NOTIFICATIONS ==========
@@ -17,6 +26,10 @@ def notify_new_message(sender, instance, created, **kwargs):
     recipient = instance.recipient
 
     if not recipient or not sender_user or recipient == sender_user:
+        return
+
+    # ✅ ADD THIS CHECK
+    if not should_notify(recipient):
         return
 
     metadata = {
@@ -57,43 +70,45 @@ def notify_proposal_events(sender, instance, created, **kwargs):
     # ---- (a) New proposal submitted → notify client ----
     if created:
         if client and freelancer:
-            Notification.objects.create(
-                user=client,
-                type=Notification.TYPE_PROPOSAL,
-                title="New proposal received",
-                message=(
-                    f"{freelancer.get_full_name() or freelancer.email} "
-                    f"submitted a proposal for \"{project.title}\"."
-                ),
-                metadata={
-                    "proposal_id": instance.id,
-                    "project_id": project.id,
-                    "freelancer_id": freelancer.id,
-                    "freelancer_name": freelancer.get_full_name() or freelancer.email,
-                },
-            )
+            # ✅ ADD THIS CHECK
+            if should_notify(client):
+                Notification.objects.create(
+                    user=client,
+                    type=Notification.TYPE_PROPOSAL,
+                    title="New proposal received",
+                    message=(
+                        f"{freelancer.get_full_name() or freelancer.email} "
+                        f"submitted a proposal for \"{project.title}\"."
+                    ),
+                    metadata={
+                        "proposal_id": instance.id,
+                        "project_id": project.id,
+                        "freelancer_id": freelancer.id,
+                        "freelancer_name": freelancer.get_full_name() or freelancer.email,
+                    },
+                )
         return
 
     # ---- (b) Proposal status changed → notify freelancer ----
-    # Check if status actually changed
     previous_status = _proposal_previous_status.get(instance.pk)
     current_status = instance.status
     
-    # Only notify if status changed to accepted or rejected
     if previous_status and previous_status != current_status:
         if current_status in ["accepted", "rejected"] and freelancer and project:
-            status_text = "accepted" if current_status == "accepted" else "rejected"
-            Notification.objects.create(
-                user=freelancer,
-                type=Notification.TYPE_PROPOSAL,
-                title=f"Proposal {status_text}",
-                message=f"Your proposal for \"{project.title}\" was {status_text}.",
-                metadata={
-                    "proposal_id": instance.id,
-                    "project_id": project.id,
-                    "status": current_status,
-                },
-            )
+            # ✅ ADD THIS CHECK
+            if should_notify(freelancer):
+                status_text = "accepted" if current_status == "accepted" else "rejected"
+                Notification.objects.create(
+                    user=freelancer,
+                    type=Notification.TYPE_PROPOSAL,
+                    title=f"Proposal {status_text}",
+                    message=f"Your proposal for \"{project.title}\" was {status_text}.",
+                    metadata={
+                        "proposal_id": instance.id,
+                        "project_id": project.id,
+                        "status": current_status,
+                    },
+                )
     
     if instance.pk in _proposal_previous_status:
         del _proposal_previous_status[instance.pk]
@@ -129,20 +144,24 @@ def notify_contract_created(sender, instance, created, **kwargs):
 
     # Notify client
     if client:
-        Notification.objects.create(
-            user=client,
-            type=Notification.TYPE_CONTRACT,
-            title=title,
-            message=message,
-            metadata=metadata,
-        )
+        # ✅ ADD THIS CHECK
+        if should_notify(client):
+            Notification.objects.create(
+                user=client,
+                type=Notification.TYPE_CONTRACT,
+                title=title,
+                message=message,
+                metadata=metadata,
+            )
 
     # Notify freelancer
     if freelancer:
-        Notification.objects.create(
-            user=freelancer,
-            type=Notification.TYPE_CONTRACT,
-            title=title,
-            message=message,
-            metadata=metadata,
-        )
+        # ✅ ADD THIS CHECK
+        if should_notify(freelancer):
+            Notification.objects.create(
+                user=freelancer,
+                type=Notification.TYPE_CONTRACT,
+                title=title,
+                message=message,
+                metadata=metadata,
+            )

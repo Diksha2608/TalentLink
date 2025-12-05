@@ -180,6 +180,16 @@ export default function SignIn({ setUser }) {
             <p id="signin-password-help" className="sr-only">
               Toggle to reveal or hide the password.
             </p>
+
+            {/* 🔐 Forgot password link (added) */}
+            <div className="mt-2 text-right">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-purple-600 hover:underline font-medium"
+              >
+                Forgot your password?
+              </Link>
+            </div>
           </div>
 
           <button

@@ -33,7 +33,8 @@ INSTALLED_APPS = [
     'notifications.apps.NotificationsConfig',
     'jobs.apps.JobsConfig',
     'saved_items.apps.SavedItemsConfig',
-    'workspaces.apps.WorkspacesConfig'
+    'workspaces.apps.WorkspacesConfig',
+    'helpcentre', 
 ]
 
 MIDDLEWARE = [
@@ -108,6 +109,18 @@ REST_FRAMEWORK = {
     ),
 }
 
+# ============= EMAIL / FRONTEND SETTINGS (added) =============
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "talentlink58@gmail.com"
+EMAIL_HOST_PASSWORD = "qjyg zwhm lzvr ipnv"  # app password
+DEFAULT_FROM_EMAIL = "TalentLink <talentlink58@gmail.com>"
+
+# URL where the React app runs (used in password reset links if needed)
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
 # ============= JWT SETTINGS =============
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
@@ -162,3 +175,5 @@ ALLOWED_FILE_EXTENSIONS = [
     'jpg', 'jpeg', 'png', 'gif', 'pdf', 
     'doc', 'docx', 'txt', 'zip'
 ]
+
+GEMINI_API_KEY = "AIzaSyD4OZ9OpZTo7rCU2-jfk3JHANpvtok_thk"

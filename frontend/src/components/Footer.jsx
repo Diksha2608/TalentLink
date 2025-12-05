@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Footer({ user }) {
   return (
     <footer className="bg-gray-900 text-white mt-auto">
@@ -14,9 +16,9 @@ export default function Footer({ user }) {
                 <div>
                   <h4 className="font-semibold mb-4 text-lg">For Freelancers</h4>
                   <ul className="space-y-2 text-gray-400">
-                    <li><a href="/projects" className="hover:text-white transition">Find Work</a></li>
-                    <li><a href="/dashboard/freelancer" className="hover:text-white transition">My Proposals</a></li>
-                    <li><a href="/contracts" className="hover:text-white transition">My Contracts</a></li>
+                    <li><Link to="/projects" className="hover:text-white transition">Find Work</Link></li>
+                    <li><Link to="/dashboard/freelancer" className="hover:text-white transition">My Proposals</Link></li>
+                    <li><Link to="/contracts" className="hover:text-white transition">My Contracts</Link></li>
                   </ul>
                 </div>
               )}
@@ -25,9 +27,9 @@ export default function Footer({ user }) {
                 <div>
                   <h4 className="font-semibold mb-4 text-lg">For Clients</h4>
                   <ul className="space-y-2 text-gray-400">
-                    <li><a href="/dashboard/client" className="hover:text-white transition">Post Project</a></li>
-                    <li><a href="/dashboard/client" className="hover:text-white transition">My Projects</a></li>
-                    <li><a href="/contracts" className="hover:text-white transition">My Contracts</a></li>
+                    <li><Link to="/projects/create" className="hover:text-white transition">Post Project</Link></li>
+                    <li><Link to="/dashboard/client" className="hover:text-white transition">My Projects</Link></li>
+                    <li><Link to="/contracts" className="hover:text-white transition">My Contracts</Link></li>
                   </ul>
                 </div>
               )}
@@ -37,17 +39,17 @@ export default function Footer({ user }) {
           <div>
             <h4 className="font-semibold mb-4 text-lg">Company</h4>
             <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-white transition">About</a></li>
-              <li><a href="#" className="hover:text-white transition">Contact</a></li>
-              <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
+              <li><Link to="/about" className="hover:text-white transition">About</Link></li>
+              <li><Link to="/contact" className="hover:text-white transition">Contact</Link></li>
+              <li><Link to="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-semibold mb-4 text-lg">Support</h4>
             <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-white transition">Help Center</a></li>
-              <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
+              <li><Link to="/help" className="hover:text-white transition">Help Center</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition">Terms of Service</Link></li>
             </ul>
           </div>
         </div>

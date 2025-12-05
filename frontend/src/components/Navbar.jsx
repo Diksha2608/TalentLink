@@ -169,7 +169,8 @@ export default function Navbar({ user, setUser, loading }) {
   }
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 shadow-sm sticky top-0 z-50 text-gray-900 dark:text-slate-100">
+
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center gap-4">
           {/* Left: Logo + main links */}
@@ -475,7 +476,7 @@ export default function Navbar({ user, setUser, loading }) {
                       Logout
                     </button>
 
-                    <button
+                    {/* <button
                       onClick={() => {
                         if (
                           confirm(
@@ -489,7 +490,7 @@ export default function Navbar({ user, setUser, loading }) {
                     >
                       <Trash2 size={16} />
                       Delete Account
-                    </button>
+                    </button> */}
                   </div>
                 )}
               </div>

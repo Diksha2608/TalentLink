@@ -1,17 +1,36 @@
-from rest_framework import viewsets, permissions, parsers, response, status, filters
+from rest_framework import viewsets, permissions, parsers, response, status, filters, serializers  # ✅ added serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView  # ✅ added
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 from django.db.models import Q, Count
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import FreelancerProfile, Skill, ClientProfile, PortfolioFile
+from .models import FreelancerProfile, Skill, ClientProfile, PortfolioFile, ContactMessage  # ✅ added ContactMessage
 from .serializers import (
     UserSerializer, FreelancerProfileSerializer, UserRegistrationSerializer, 
     SkillSerializer, EmailTokenObtainSerializer, ClientProfileSerializer, PortfolioFileSerializer
 )
+
+from django.db import transaction
+
+from projects.models import Project
+from proposals.models import Proposal
+from contracts.models import Contract, Review
+from jobs.models import Job, JobAttachment, JobApplication, JobApplicationAttachment
+from messaging.models import Message
+ 
+
+from django.core.mail import send_mail
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.tokens import default_token_generator as token_generator
+from django.conf import settings
+
+from .models import User  # or your AUTH_USER_MODEL import if different
+
 
 User = get_user_model()
 
@@ -117,6 +136,159 @@ class UserViewSet(viewsets.ModelViewSet):
         except FreelancerProfile.DoesNotExist:
             return Response({'detail': 'Freelancer profile not found.'}, status=status.HTTP_404_NOT_FOUND)
         return Response({'detail': 'No resume file provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[AllowAny],
+        url_path='forgot-password'
+    )
+
+
+    def forgot_password(self, request):
+        """
+        Step 1: User submits email, we send a reset link with uid+token.
+        """
+        email = request.data.get('email')
+
+        if not email:
+            return Response({"error": "Email is required"}, status=400)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # For security you *could* return generic message,
+            # but following your teammate we return explicit error.
+            return Response({"error": "No user found with this email"}, status=404)
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = token_generator.make_token(user)
+
+        reset_link = f"http://localhost:5173/reset-password?uid={uid}&token={token}"
+        # if you prefer to use a configurable URL:
+        # frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+        # reset_link = f"{frontend_url}/reset-password?uid={uid}&token={token}"
+
+        send_mail(
+            subject="Reset your TalentLink password",
+            message=f"Click this link to reset your password: {reset_link}",
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@talentlink.com"),
+            recipient_list=[email],
+            fail_silently=True,
+        )
+
+        return Response({"message": "Password reset link sent"}, status=200)
+
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[AllowAny],
+        url_path='reset-password'
+    )
+    def reset_password(self, request):
+        """
+        Step 2: User posts uid, token, and new_password to actually reset.
+        NOTE: Token validation is skipped (as in your teammate’s flow).
+        """
+        uid = request.data.get("uid")
+        token = request.data.get("token")  # currently unused, included for future validation
+        new_password = request.data.get("new_password")
+
+        if not uid:
+            return Response({"error": "UID is required"}, status=400)
+        if not new_password:
+            return Response({"error": "New password is required"}, status=400)
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+        except Exception:
+            return Response({"error": "Invalid UID"}, status=400)
+
+        # 🔐 No token validation for now, exactly like your teammate's code.
+        user.set_password(new_password)
+        user.save()
+
+        return Response({"message": "Password reset successful"}, status=200)
+    
+    @action(
+        detail=False,
+        methods=['delete'],
+        permission_classes=[IsAuthenticated],
+        url_path='delete-account'
+    )
+    def delete_account(self, request):
+        """
+        Permanently delete the authenticated user's account and all related data.
+        """
+        user = request.user
+
+        with transaction.atomic():
+            # ----------------------
+            # Freelancer profile and portfolio files
+            # ----------------------
+            if hasattr(user, 'freelancer_profile'):
+                profile = user.freelancer_profile
+                profile.portfolio_files.all().delete()
+                profile.delete()
+
+            # ----------------------
+            # Client profile
+            # ----------------------
+            if hasattr(user, 'client_profile'):
+                user.client_profile.delete()
+
+            # ----------------------
+            # Projects (if client)
+            # ----------------------
+            Project.objects.filter(client=user).delete()
+
+            # ----------------------
+            # Proposals (if freelancer)
+            # ----------------------
+            Proposal.objects.filter(freelancer=user).delete()
+
+            # ----------------------
+            # Contracts and reviews
+            # ----------------------
+            Contract.objects.filter(proposal__freelancer=user).delete()
+            Review.objects.filter(reviewer=user).delete()
+            Review.objects.filter(reviewee=user).delete()
+
+            # ----------------------
+            # Jobs posted (client) and applications (freelancer)
+            # ----------------------
+            JobAttachment.objects.filter(job__client=user).delete()
+            Job.objects.filter(client=user).delete()
+
+            JobApplicationAttachment.objects.filter(application__freelancer=user).delete()
+            JobApplication.objects.filter(freelancer=user).delete()
+
+            # ----------------------
+            # Messages and Conversations
+            # ----------------------
+            Message.objects.filter(sender=user).delete()
+            Message.objects.filter(recipient=user).delete()
+
+            # Delete conversations that only have this user left
+            for convo in user.conversations.all():
+                if convo.participants.count() <= 1:
+                    convo.delete()
+
+            # ----------------------
+            # Notifications (reverse relation)
+            # ----------------------
+            user.notifications.all().delete()
+
+            # ----------------------
+            # Finally delete the user
+            # ----------------------
+            user.delete()
+
+        return Response(
+            {"message": "Your account and all associated data have been deleted successfully."},
+            status=status.HTTP_200_OK
+        )
 
 class FreelancerProfileViewSet(viewsets.ModelViewSet):
     queryset = FreelancerProfile.objects.all()
@@ -341,6 +513,40 @@ class ClientProfileViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         return self.me(request, *args, **kwargs)
+class ContactMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ['id', 'name', 'email', 'message', 'created_at']
+
+# API View
+class ContactMessageView(APIView):
+    permission_classes = [permissions.AllowAny]  # <--- Allow public access
+
+    def post(self, request):
+        serializer = ContactMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            contact = serializer.save()
+
+            # Send email to company
+            try:
+                send_mail(
+                    subject=f"New Contact Message from {contact.name}",
+                    message=f"Name: {contact.name}\nEmail: {contact.email}\n\nMessage:\n{contact.message}",
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[settings.DEFAULT_FROM_EMAIL],  # TalentLink email
+                    fail_silently=False,
+                )
+            except Exception as e:
+                return Response(
+                    {"error": f"Message saved but failed to send email: {str(e)}"},
+                    status=500
+                )
+
+            return Response(
+                {"message": "Contact message sent successfully."},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class SkillViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Skill.objects.all()

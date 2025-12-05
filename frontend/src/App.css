@@ -97,3 +97,12 @@ a::after, a::before {
   background: transparent !important;
   content: attr(data-content) !important;
 }
+
+/* Global dark mode fallback
+.dark .page-container,
+.dark .container,
+.dark .content,
+.dark main {
+  background-color: #0f172a !important; /* slate-900 */
+  /* color: #e2e8f0 !important; slate-200 */
+/* } */ 
