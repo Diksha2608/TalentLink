@@ -447,7 +447,6 @@ export default function ContractDetail({ user }) {
                 </button>
               )}
 
-              {/* ❌ removed Mark as Completed button from here; completion handled in Workspace */}
 
               {contract.status === 'completed' && (
                 <div className="flex items-center gap-2 text-green-700">
@@ -456,7 +455,7 @@ export default function ContractDetail({ user }) {
                 </div>
               )}
 
-              {/* Workspace Link for Active Contracts (unchanged logic) */}
+              {/* Workspace Link for Active Contracts*/}
               {contract.status === 'active' && (
                 <Link
                   to={`/workspace`}

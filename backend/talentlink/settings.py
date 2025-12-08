@@ -176,4 +176,4 @@ ALLOWED_FILE_EXTENSIONS = [
     'doc', 'docx', 'txt', 'zip'
 ]
 
-GEMINI_API_KEY = "AIzaSyD4OZ9OpZTo7rCU2-jfk3JHANpvtok_thk"
+GEMINI_API_KEY = "AIzaSyDAP829g5RBj_sGpD8aRdedYSUzo1ftfQs"

@@ -81,12 +81,12 @@ export default function ClientDashboard({ user }) {
     loadDashboardData();
   }, []);
 
-  const loadDashboardData = async () => {
+    const loadDashboardData = async () => {
     try {
-      // PROJECTS
-      const projectsRes = await projectsAPI.list();
-      const allProjects = projectsRes.data.results || projectsRes.data;
-      const myProjects = allProjects.filter((p) => p.client === user.id);
+      const projectsRes = await projectsAPI.list({ my_projects: true });
+      const myProjects = projectsRes.data.results || projectsRes.data;
+      
+      console.log('✅ Loaded my projects:', myProjects.length);
       setProjects(myProjects);
 
       const projectProposalCount = myProjects.reduce(
@@ -94,10 +94,10 @@ export default function ClientDashboard({ user }) {
         0
       );
 
-      // JOBS
-      const jobsRes = await jobsAPI.list();
-      const allJobs = jobsRes.data.results || jobsRes.data;
-      const myJobs = allJobs.filter((j) => j.client === user.id);
+      const jobsRes = await jobsAPI.list({ my_jobs: true });
+      const myJobs = jobsRes.data.results || jobsRes.data;
+      
+      console.log('✅ Loaded my jobs:', myJobs.length);
       setJobs(myJobs);
 
       let jobApplicationCount = 0;

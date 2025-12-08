@@ -236,6 +236,30 @@ class Review(models.Model):
     def __str__(self):
         reviewer_name = self.reviewer_name or (self.reviewer.get_full_name() if self.reviewer else 'Anonymous')
         return f"Review for {self.reviewee.get_full_name()} by {reviewer_name}"
+    def update_reviewee_rating(self):
+        """
+        Recalculate and store the main rating for the reviewee
+        based ONLY on verified platform reviews.
+        """
+        if not self.reviewee_id:
+            return
+
+        from django.db.models import Avg  # local import to avoid circulars
+
+        qs = Review.objects.filter(
+            reviewee_id=self.reviewee_id,
+            review_type='platform',
+            is_verified=True,
+        )
+
+        agg = qs.aggregate(avg_rating=Avg('rating'))
+        avg_rating = agg['avg_rating'] or 0.0
+
+        # If your User model has a rating_avg field, keep it in sync
+        reviewee = self.reviewee
+        if hasattr(reviewee, 'rating_avg'):
+            reviewee.rating_avg = avg_rating
+            reviewee.save(update_fields=['rating_avg'])
 
 
 class ReviewResponse(models.Model):

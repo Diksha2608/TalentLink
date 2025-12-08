@@ -130,7 +130,7 @@ export default function ProjectDetail({ user }) {
       formData.append('bid_amount', proposalForm.bid_amount);
       formData.append('estimated_time', proposalForm.estimated_time);
 
-      // ✅ NEW fields
+      // NEW fields
       if (proposalForm.proposed_solution)
         formData.append('proposed_solution', proposalForm.proposed_solution);
       if (proposalForm.portfolio_links)
@@ -138,14 +138,14 @@ export default function ProjectDetail({ user }) {
       if (proposalForm.availability)
         formData.append('availability', proposalForm.availability);
 
-      // ✅ Relevant skills ids (SkillSelector)
+      // Relevant skills ids (SkillSelector)
       (selectedSkills || []).forEach((skill) => {
         if (skill?.id != null) {
           formData.append('relevant_skills_ids', skill.id);
         }
       });
 
-      // ✅ Files: resume + up to 5 portfolio files
+
       if (proposalForm.resume_file) {
         formData.append('resume', proposalForm.resume_file);
       }
@@ -168,7 +168,7 @@ export default function ProjectDetail({ user }) {
       });
       setSelectedSkills([]);
 
-      // so freelancer can view submitted proposal
+
       setUserProposal(res.data);
 
       alert('Proposal submitted successfully!');
@@ -768,7 +768,7 @@ export default function ProjectDetail({ user }) {
             <div className="max-w-3xl w-full" onClick={(e) => e.stopPropagation()}>
               <FreelancerCard 
                 freelancer={{
-                  // Merge user data with profile
+                  
                   id: freelancerForModal.id,
                   hourly_rate: freelancerForModal.hourly_rate || 0,
                   availability: freelancerForModal.availability,

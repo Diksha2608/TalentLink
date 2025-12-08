@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, Avg
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -223,6 +223,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
                 message=f'You received a {review.rating}-star review from {review.reviewer.get_full_name() or review.reviewer.username}.',
                 metadata={'review_id': review.id}
             )
+            # ✅ Recalculate the reviewee's main rating from platform reviews
+            review.update_reviewee_rating()
         
         # For external reviews, send verification email
         elif review.review_type == 'external':
@@ -389,9 +391,19 @@ class ReviewStatsView(viewsets.ViewSet):
             review_type='external',
         )
 
+        # ✅ Compute average directly from platform reviews
+        avg_data = platform_reviews.aggregate(avg_rating=Avg('rating'))
+        average_rating = avg_data['avg_rating'] or 0.0
+
+        # Optional: keep user.rating_avg in sync if the field exists
+        if hasattr(user, 'rating_avg'):
+            if user.rating_avg != average_rating:
+                user.rating_avg = average_rating
+                user.save(update_fields=['rating_avg'])
+
         stats = {
             'total_reviews': platform_reviews.count(),
-            'average_rating': user.rating_avg,
+            'average_rating': average_rating,
             'rating_distribution': {
                 '5': platform_reviews.filter(rating=5).count(),
                 '4': platform_reviews.filter(rating=4).count(),

@@ -29,8 +29,19 @@ class JobViewSet(viewsets.ModelViewSet):
         serializer.save(client=self.request.user)
 
     def get_queryset(self):
-        qs = Job.objects.filter(visibility='public')
         params = self.request.query_params
+        
+        # FIX: Check if this is a "my_jobs" request from dashboard
+        my_jobs = params.get('my_jobs', '').lower() == 'true'
+        
+        if my_jobs and self.request.user and self.request.user.is_authenticated:
+            # Return ALL jobs for this client (no visibility or status filter)
+            qs = Job.objects.filter(client=self.request.user)
+            print(f"\n✅ MY_JOBS MODE: Returning {qs.count()} jobs for user {self.request.user.id}")
+            return qs
+        
+        # Normal public listing
+        qs = Job.objects.filter(visibility='public')
 
         # Filters
         status_param = params.get('status', '').strip()
@@ -158,30 +169,22 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # ======================================
-    # ACCEPT APPLICATION
-    # ======================================
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
         application = self.get_object()
         job = application.job
 
-        # Only client can accept
         if job.client != request.user:
             return Response({'detail': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Reject other pending applications
         JobApplication.objects.filter(job=job, status='pending').exclude(id=application.id).update(status='rejected')
 
-        # Accept this application
         application.status = 'accepted'
         application.save()
 
-        # Update job
         job.status = 'in_progress'
         job.save()
 
-        # Create Contract
         try:
             from contracts.models import Contract
 
@@ -214,7 +217,6 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 freelancer_signed=False
             )
 
-            # Notify freelancer
             try:
                 from notifications.models import Notification
                 Notification.objects.create(
@@ -240,9 +242,6 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
                 'error': str(e)
             }, status=status.HTTP_200_OK)
 
-    # ======================================
-    # REJECT APPLICATION
-    # ======================================
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         application = self.get_object()

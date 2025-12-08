@@ -1,10 +1,3 @@
-/**
- * Unified profile completion calculation used across:
- * - FreelancerDashboard
- * - FreelancerProfile
- * - OnboardingWizard
- */
-
 export const calculateProfileCompletion = (user, freelancerProfile) => {
   if (!freelancerProfile) {
     return { percentage: 0, completedCount: 0, totalCount: 11, missingItems: [], sectionChecks: {} };
@@ -17,7 +10,6 @@ export const calculateProfileCompletion = (user, freelancerProfile) => {
   );
   const portfolioFiles = p.portfolio_files || [];
 
-  // Define all checks with labels
   const checks = [
     {
       key: 'avatar',

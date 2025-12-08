@@ -28,7 +28,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         source='skills_required',
         required=False
     )
-    proposal_count = serializers.SerializerMethodField()  # total proposals for this project
+    proposal_count = serializers.SerializerMethodField()
 
     duration_estimate = serializers.CharField(write_only=True, required=False, allow_blank=True)
     file_attachments = ProjectAttachmentSerializer(many=True, read_only=True)
@@ -43,7 +43,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             'experience_level', 'location_type', 'client_location',
             'status', 'visibility', 'attachments', 'category',
             'file_attachments',
-            # proposal stats
             'proposal_count',
             'created_at', 'updated_at'
         ]
@@ -51,13 +50,25 @@ class ProjectSerializer(serializers.ModelSerializer):
         extra_kwargs = {'attachments': {'read_only': True}}
 
     def get_proposal_count(self, obj):
-        # total proposals linked to this project (all statuses)
         return obj.proposals.count()
 
     def validate(self, attrs):
         de = attrs.pop('duration_estimate', None)
         if de:
             attrs['duration'] = de
+        
+        # FIX: Ensure integer conversion for budget fields
+        if 'budget_min' in attrs:
+            attrs['budget_min'] = int(attrs['budget_min'])
+        if 'budget_max' in attrs:
+            attrs['budget_max'] = int(attrs['budget_max'])
+        if 'fixed_payment' in attrs and attrs['fixed_payment'] is not None:
+            attrs['fixed_payment'] = int(attrs['fixed_payment'])
+        if 'hourly_min' in attrs and attrs['hourly_min'] is not None:
+            attrs['hourly_min'] = int(attrs['hourly_min'])
+        if 'hourly_max' in attrs and attrs['hourly_max'] is not None:
+            attrs['hourly_max'] = int(attrs['hourly_max'])
+            
         return super().validate(attrs)
 
     def _validate_files(self, request, project_instance=None):

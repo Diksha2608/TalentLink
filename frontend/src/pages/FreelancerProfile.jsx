@@ -12,6 +12,8 @@ import { authAPI } from '../api/auth';
 // import ReviewList from '../components/ReviewList';
 import RatingDisplay from '../components/RatingDisplay';
 import { calculateProfileCompletion } from '../api/profileCompletionUtils'
+import { reviewsAPI } from '../api/reviews';
+import { workspacesAPI } from '../api/workspaces';
 
 export default function FreelancerProfile({ user, setUser }) {
   const [activeSection, setActiveSection] = useState('basic');
@@ -27,7 +29,10 @@ export default function FreelancerProfile({ user, setUser }) {
 
   const [freelancerProfile, setFreelancerProfile] = useState(null);
   const [portfolioFiles, setPortfolioFiles] = useState([]);
-
+  const [averageRating, setAverageRating] = useState(user?.rating_avg || 0);
+  const [earningsStats, setEarningsStats] = useState({
+    totalEarnings: 0,
+  });
   const [formData, setFormData] = useState({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
@@ -57,6 +62,63 @@ export default function FreelancerProfile({ user, setUser }) {
 
   useEffect(() => { loadProfile(); }, []);
 
+    useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    reviewsAPI
+      .getStats(user.id)
+      .then((res) => {
+        if (cancelled) return;
+        const avg = res.data?.average_rating ?? 0;
+        setAverageRating(avg);
+      })
+      .catch((err) => {
+        console.error('Failed to load rating stats:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+    useEffect(() => {
+    // Load total earnings stats for sidebar
+    const loadEarningsStats = async () => {
+      try {
+        // Get all workspaces where user is freelancer
+        const wsRes = await workspacesAPI.list();
+        const workspacesData = Array.isArray(wsRes.data)
+          ? wsRes.data
+          : wsRes.data.results || wsRes.data.workspaces || [];
+
+        // Fetch payments from all workspaces
+        const paymentsPromises = workspacesData.map((ws) =>
+          workspacesAPI.getPayments(ws.id).catch(() => ({ data: [] }))
+        );
+
+        const paymentsResults = await Promise.all(paymentsPromises);
+
+        // Flatten and filter confirmed payments only (same as Earnings page)
+        const allPaymentsData = paymentsResults.flatMap((res) => {
+          const data = Array.isArray(res.data) ? res.data : res.data.results || [];
+          return data.filter((payment) => payment.freelancer_confirmed);
+        });
+
+        const totalEarnings = allPaymentsData.reduce(
+          (sum, p) => sum + parseFloat(p.amount || 0),
+          0
+        );
+
+        setEarningsStats({ totalEarnings });
+      } catch (err) {
+        console.error('Failed to load earnings stats:', err);
+      }
+    };
+
+    loadEarningsStats();
+  }, []);
+  
 const loadProfile = async () => {
   try {
     const profileResponse = await authAPI.getFreelancerProfile();
@@ -130,13 +192,11 @@ const loadProfile = async () => {
   };
 
   const calculateCompletion = () => {
-    const data = savedProfile || formData; // Use saved profile data
+    const data = savedProfile || formData; 
     
-    // Use unified profile completion utility
     const completion = calculateProfileCompletion(
       { 
         ...user,
-        // Include any unsaved changes
         bio: data.bio,
         location: data.location,
         phone: data.phone,
@@ -458,14 +518,25 @@ const loadProfile = async () => {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Total Earnings</span>
-                    <span className="font-bold text-green-600">₹{freelancerProfile?.total_earnings || 0}</span>
+                    <span className="font-bold text-green-600">
+                      ₹{Number(
+                        earningsStats.totalEarnings ??
+                        freelancerProfile?.total_earnings ??
+                        0
+                      ).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Average Rating</span>
                     <span className="font-bold text-yellow-600 flex items-center gap-1">
                       <Star size={14} fill="currentColor" />
-                      {user?.rating_avg?.toFixed(1) || '0.0'}
+                      {Number(averageRating || 0).toFixed(1)}
                     </span>
+
                   </div>
                 </div>
               </div>
@@ -1239,34 +1310,35 @@ const loadProfile = async () => {
                 </a>
               </div>
 
-              {typeof user?.rating_avg === 'number' && user.rating_avg > 0 ? (
-                <div className="flex flex-col md:flex-row md:items-center gap-6">
-                  <div className="text-center md:text-left">
-                    <div className="text-4xl font-bold text-purple-600">
-                      {user.rating_avg.toFixed(1)}
-                    </div>
-
-                    <RatingDisplay
-                      rating={user.rating_avg}
-                      showNumber={false}
-                      size="lg"
-                      className="mt-1 justify-center md:justify-start"
-                    />
-
-                    <p className="text-sm text-gray-600 mt-1">
-                      Overall rating based on client feedback
-                    </p>
+            {typeof averageRating === 'number' && averageRating > 0 ? (
+              <div className="flex flex-col md:flex-row md:items-center gap-6">
+                <div className="text-center md:text-left">
+                  <div className="text-4xl font-bold text-purple-600">
+                    {averageRating.toFixed(1)}
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <Star size={32} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-gray-600">No reviews yet</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Once you complete projects, client reviews will appear here.
+
+                  <RatingDisplay
+                    rating={averageRating}
+                    showNumber={false}
+                    size="lg"
+                    className="mt-1 justify-center md:justify-start"
+                  />
+
+                  <p className="text-sm text-gray-600 mt-1">
+                    Overall rating based on client feedback
                   </p>
                 </div>
-              )}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-lg">
+                <Star size={32} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-gray-600">No reviews yet</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Once you complete projects, client reviews will appear here.
+                </p>
+              </div>
+            )}
+
             </div>
 
           </div>

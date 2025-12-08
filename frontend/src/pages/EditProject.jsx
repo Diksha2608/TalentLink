@@ -256,7 +256,7 @@ export default function EditProject({ user }) {
 
   useEffect(() => {
     loadProject();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  
   }, [id]);
 
   const loadProject = async () => {
@@ -383,9 +383,8 @@ export default function EditProject({ user }) {
 
       files.forEach(f => fd.append('attachments', f));
 
-      // 🔁 Update instead of create
+    
       await projectsAPI.update(id, fd);
-      // if your api is `update`, use: await projectsAPI.update(id, fd);
 
       navigate(`/projects/${id}`);
     } catch (err) {

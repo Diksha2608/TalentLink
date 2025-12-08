@@ -44,15 +44,12 @@ class Job(models.Model):
     location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='remote')
     location = models.CharField(max_length=200, blank=True, null=True)
 
-    # For hourly jobs
-    hourly_min = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
-                                     validators=[MinValueValidator(0)])
-    hourly_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
-                                     validators=[MinValueValidator(0)])
+    # FIX: Changed to IntegerField for hourly jobs
+    hourly_min = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    hourly_max = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
 
-    # For fixed price jobs
-    fixed_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
-                                       validators=[MinValueValidator(0)])
+    # FIX: Changed to IntegerField for fixed price jobs
+    fixed_amount = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     visibility = models.CharField(max_length=20,
@@ -91,7 +88,9 @@ class JobApplication(models.Model):
     job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='applications')
     freelancer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='job_applications_sent')
     cover_letter = models.TextField()
-    bid_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    
+    # FIX: Changed to IntegerField for bid amount
+    bid_amount = models.IntegerField(validators=[MinValueValidator(0)])
 
     # NOW OPTIONAL: estimated time should not be forced for jobs like receptionist
     estimated_time = models.CharField(max_length=100, blank=True, null=True)

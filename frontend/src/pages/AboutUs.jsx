@@ -6,7 +6,6 @@ const TEAM_MEMBERS = [
   { name: "Chitra Chandra Sowrya", role: "Full Stack Developer", initials: "C" },
   { name: "Rasika S", role: "Full Stack Developer", initials: "R" },
   { name: "Mekala Dinesh Kumar Reddy", role: "Full Stack Developer", initials: "D" },
-  { name: "Sai Charan Chearla", role: "Full Stack Developer", initials: "S" },
   { name: "Shivam Patil", role: "Full Stack Developer", initials: "S" },
 ];
 

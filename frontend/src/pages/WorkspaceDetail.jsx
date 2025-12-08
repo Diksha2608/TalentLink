@@ -1123,7 +1123,7 @@ export default function WorkspaceDetail({ user }) {
                     </div>
                 </div>
                 ) : (
-                // ---------- FREELANCER VIEW (old donut) ----------
+                // ---------- FREELANCER VIEW----------
                 <div>
                     <h4 className="font-semibold mb-4">Task Completion Rate</h4>
                     <div className="flex flex-col items-center justify-center h-64">
@@ -1613,7 +1613,7 @@ export default function WorkspaceDetail({ user }) {
 }
 
 // Task Card Component
-// Task Card Component
+
 function TaskCard({ task, onStatusChange, onDelete, onClick, isClient }) {
   const getStatusColor = (status) => {
     const colors = {

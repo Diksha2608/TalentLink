@@ -145,7 +145,7 @@ export default function SavedItemsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {activeTab === 'projects' ? (
-              // Render Projects using your ProjectCard component
+           
               savedProjects.map((project) => (
                 <div key={project.id} className="relative">
                   <ProjectCard project={project} showSaveButton={false} />
@@ -159,7 +159,7 @@ export default function SavedItemsPage() {
                 </div>
               ))
             ) : (
-              // Render Jobs inline (since you don't have JobCard component)
+            
               savedJobs.map((job) => (
                 <div key={job.id} className="relative">
                   <Link to={`/jobs/${job.id}`}>

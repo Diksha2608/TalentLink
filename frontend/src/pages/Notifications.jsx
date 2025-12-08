@@ -47,7 +47,6 @@ export default function Notifications() {
     }
   };
 
-  // ✅ NEW: clear all notifications
   const clearAllNotifications = async () => {
     try {
       await notificationsAPI.clearAll();
@@ -170,7 +169,7 @@ export default function Notifications() {
             Notifications
           </h1>
 
-          {/* ✅ NEW: section for actions on the right */}
+       
           {items.length > 0 && (
             <div className="flex items-center gap-2">
               {items.some((n) => !n.is_read) && (
@@ -227,7 +226,7 @@ export default function Notifications() {
                         {new Date(n.created_at).toLocaleString()}
                       </span>
 
-                      {/* ✅ NEW: per-notification clear (cross) */}
+          
                       <button
                         onClick={(e) => clearNotification(e, n.id)}
                         className="p-1 rounded-full hover:bg-red-50 text-red-500"

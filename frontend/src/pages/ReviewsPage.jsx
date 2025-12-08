@@ -85,7 +85,7 @@ export default function ReviewsPage({ user }) {
           </div>
         </div>
 
-        {/* Your existing ReviewList component handles everything */}
+        
         <ReviewList userId={user.id} currentUserId={user.id} />
       </div>
     </div>

@@ -1,4 +1,3 @@
-// frontend/src/pages/JobDetail.jsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -13,6 +12,7 @@ import {
 import { jobsAPI } from "../api/jobs";
 import { jobApplicationsAPI } from "../api/jobApplications";
 import JobApplicationForm from "../components/JobApplicationForm";
+import FreelancerCard from "../components/FreelancerCard";
 
 const EXPERIENCE_MAP = {
   entry: "Entry Level",
@@ -38,6 +38,10 @@ export default function JobDetail({ user }) {
   const [submitting, setSubmitting] = useState(false);
   const [checkingApplication, setCheckingApplication] = useState(true);
   const [applications, setApplications] = useState([]);
+
+  // For full freelancer details modal (same pattern as ProjectDetail)
+  const [freelancerModalOpen, setFreelancerModalOpen] = useState(false);
+  const [freelancerForModal, setFreelancerForModal] = useState(null);
 
   useEffect(() => {
     loadJob();
@@ -100,15 +104,28 @@ export default function JobDetail({ user }) {
     }
   };
 
-  const loadApplicationsForClient = async () => {
-    try {
-      const res = await jobApplicationsAPI.list({ job: id });
-      setApplications(res.data.results || []);
-    } catch (err) {
-      console.error("Failed to load applications for client:", err);
-      setApplications([]);
+const loadApplicationsForClient = async () => {
+  try {
+    const res = await jobApplicationsAPI.list({ job: id });
+
+    // Handle BOTH shapes:
+    // 1) { results: [...] }
+    // 2) [ ... ]
+    let list = [];
+
+    if (Array.isArray(res.data?.results)) {
+      list = res.data.results;
+    } else if (Array.isArray(res.data)) {
+      list = res.data;
     }
-  };
+
+    setApplications(list);
+  } catch (err) {
+    console.error("Failed to load applications for client:", err);
+    setApplications([]);
+  }
+};
+
 
   const handleDeleteJob = async () => {
     if (!window.confirm("Delete this job? This cannot be undone.")) return;
@@ -281,7 +298,7 @@ export default function JobDetail({ user }) {
             </div>
           </div>
 
-          {/* FILE ATTACHMENTS */}
+          {/* FILE ATTACHMENTS (JOB) */}
           {Array.isArray(job.file_attachments) &&
             job.file_attachments.length > 0 && (
               <div className="mt-6 border-t pt-6">
@@ -434,6 +451,20 @@ export default function JobDetail({ user }) {
                 {applications.map((app) => {
                   const freelancer = app.freelancer || {};
 
+                  const rating =
+                    typeof freelancer.rating_avg === "number"
+                      ? freelancer.rating_avg.toFixed(1)
+                      : typeof freelancer.rating === "number"
+                      ? freelancer.rating.toFixed(1)
+                      : "0.0";
+
+                  const projectsDone =
+                    typeof freelancer.projects_completed === "number"
+                      ? freelancer.projects_completed
+                      : freelancer.projectsCount || 0;
+
+                  const freelancerId = freelancer.id || app.freelancer_id;
+
                   return (
                     <li
                       className="bg-white border border-purple-200 rounded-xl p-6 shadow"
@@ -441,14 +472,30 @@ export default function JobDetail({ user }) {
                     >
                       {/* FREELANCER INFO */}
                       <div className="flex gap-4 items-start">
-                        <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center text-2xl text-purple-600 font-bold">
-                          {freelancer.name?.[0] || "?"}
+                        <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center text-2xl text-purple-600 font-bold overflow-hidden">
+                          {freelancer.avatar ? (
+                            <img
+                              src={freelancer.avatar}
+                              alt={freelancer.name || "Freelancer"}
+                              className="h-full w-full object-cover rounded-full"
+                            />
+                          ) : (
+                            <span>
+                              {(freelancer.first_name ||
+                                freelancer.name ||
+                                "F")[0]}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex-1">
                           <div className="flex gap-2 items-center flex-wrap">
                             <h3 className="text-xl font-bold text-gray-900">
-                              {freelancer.name || "Freelancer"}
+                              {freelancer.first_name || freelancer.last_name
+                                ? `${freelancer.first_name || ""} ${
+                                    freelancer.last_name || ""
+                                  }`.trim()
+                                : freelancer.name || "Freelancer"}
                             </h3>
 
                             <span
@@ -482,11 +529,9 @@ export default function JobDetail({ user }) {
                                 size={14}
                                 className="text-yellow-500"
                               />{" "}
-                              Rating {freelancer.rating || "0.0"}
+                              Rating {rating}
                             </span>
-                            <span>
-                              Projects {freelancer.projectsCount || "0"}
-                            </span>
+                            <span>Projects {projectsDone}</span>
                           </div>
                         </div>
                       </div>
@@ -502,13 +547,12 @@ export default function JobDetail({ user }) {
                           </h3>
                         </div>
 
-                        {/* Only show timing info if freelancer actually provided it */}
                         {app.estimated_time && (
                           <div>
                             <p className="text-xs text-gray-500 font-semibold">
                               Proposed Timing (optional)
                             </p>
-                            <h3 className="text-2xl font-bold text-purple-700">
+                              <h3 className="text-2xl font-bold text-purple-700">
                               {app.estimated_time}
                             </h3>
                           </div>
@@ -523,20 +567,63 @@ export default function JobDetail({ user }) {
                         <p className="text-gray-700">{app.cover_letter}</p>
                       </div>
 
+                      {/* APPLICATION ATTACHMENTS */}
+                      {Array.isArray(app.file_attachments) &&
+                        app.file_attachments.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="font-bold text-gray-900 mb-1">
+                              Attachments
+                            </h4>
+                            <ul className="space-y-2">
+                              {app.file_attachments.map((file) => (
+                                <li
+                                  key={file.id}
+                                  className="flex items-center justify-between border rounded-lg px-3 py-2 hover:bg-gray-50"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                      {file.original_name || "File"}
+                                    </p>
+                                    {typeof file.size === "number" && (
+                                      <p className="text-xs text-gray-500">
+                                        {(file.size / 1024).toFixed(1)} KB
+                                      </p>
+                                    )}
+                                  </div>
+                                  {file.file_url && (
+                                    <a
+                                      href={file.file_url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      download
+                                      className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs font-semibold hover:bg-purple-700"
+                                    >
+                                      View / Download
+                                    </a>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
                       {/* ACTION BUTTONS */}
                       <div className="flex gap-4 mt-5 flex-wrap">
+                        
                         <button
-                          onClick={() =>
-                            navigate(`/talent/${freelancer.id}`)
-                          }
-                          className="px-5 py-2 border border-gray-300 rounded-md bg-white hover:bg-purple-50 font-medium"
+                          onClick={() => {
+                            setFreelancerForModal(freelancer);
+                            setFreelancerModalOpen(true);
+                          }}
+                          className="px-3 py-1 border border-gray-300 rounded text-xs font-medium hover:bg-purple-50 hover:border-purple-300"
                         >
-                          View Full Details
+                          View Details
                         </button>
 
                         <button
                           onClick={() =>
-                            navigate(`/messages?user=${freelancer.id}`)
+                            freelancerId &&
+                            navigate(`/messages?user=${freelancerId}`)
                           }
                           className="px-5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-800 font-medium"
                         >
@@ -568,6 +655,49 @@ export default function JobDetail({ user }) {
             </section>
           )}
         </div>
+
+{/* ===== Freelancer full profile modal  ===== */}
+{freelancerModalOpen && freelancerForModal && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    onClick={() => setFreelancerModalOpen(false)}
+  >
+    <div
+      className="max-w-3xl w-full"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <FreelancerCard
+        freelancer={{
+          id: freelancerForModal.id,
+          hourly_rate: freelancerForModal.hourly_rate || 0,
+          availability: freelancerForModal.availability,
+          skills: freelancerForModal.skills || [],
+          portfolio: freelancerForModal.portfolio || '',
+          portfolio_files: freelancerForModal.portfolio_files || [],
+          role_title: freelancerForModal.role_title || '',
+          social_links: freelancerForModal.social_links || {},
+          languages: freelancerForModal.languages || [],
+          experiences: freelancerForModal.experiences || [],
+          education: freelancerForModal.education || [],
+          projects_completed: freelancerForModal.projects_completed || 0,
+          total_earnings: freelancerForModal.total_earnings || 0,
+          user: {
+            id: freelancerForModal.id,
+            first_name: freelancerForModal.first_name || '',
+            last_name: freelancerForModal.last_name || '',
+            email: freelancerForModal.email || '',
+            avatar: freelancerForModal.avatar || null,
+            bio: freelancerForModal.bio || '',
+            location: freelancerForModal.location || '',
+            rating_avg: freelancerForModal.rating_avg || 0,
+          },
+        }}
+        showChatButton={true}
+      />
+    </div>
+  </div>
+)}
+
 
         {/* APPLICATION FORM MODAL */}
         {showApplicationModal && (

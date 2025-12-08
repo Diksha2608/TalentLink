@@ -271,7 +271,7 @@ export default function Jobs({ user }) {
                 <div className="mb-4 text-sm text-gray-600">
                   <span className="font-semibold text-gray-900">{jobs.length}</span> job{jobs.length !== 1 ? 's' : ''} found
                 </div>
-                {/* ✅ GRID LAYOUT - Same as ProjectFeed */}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {jobs.map((job) => (
                     <JobCard 

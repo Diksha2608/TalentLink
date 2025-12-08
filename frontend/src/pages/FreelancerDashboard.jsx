@@ -161,7 +161,6 @@ export default function FreelancerDashboard({ user }) {
         } catch (err) {
           console.error('Error fetching workspaces/payments:', err);
           
-          // Fallback to profile data if workspace fetch fails
           if (!mounted) return;
           
           setStats({

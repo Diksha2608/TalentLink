@@ -26,7 +26,7 @@ class Project(models.Model):
 
     HOURS_PER_WEEK_CHOICES = (
         ('less_10', 'Less than 10 hrs/week'),
-        ('10_30', '10–30 hrs/week'),
+        ('10_30', '10—30 hrs/week'),
         ('more_30', 'More than 30 hrs/week'),
     )
 
@@ -56,12 +56,13 @@ class Project(models.Model):
     description = models.TextField()
     skills_required = models.ManyToManyField(Skill, blank=True)
 
-    budget_min = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    budget_max = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    # FIX: Changed to IntegerField to avoid decimal precision issues
+    budget_min = models.IntegerField(validators=[MinValueValidator(0)])
+    budget_max = models.IntegerField(validators=[MinValueValidator(0)])
 
     # Duration fields
     duration = models.CharField(max_length=20, choices=DURATION_CHOICES, default='less_1_month')
-    duration_estimate = models.CharField(max_length=100, blank=True, null=True)  # ✅ Added for seeder compatibility
+    duration_estimate = models.CharField(max_length=100, blank=True, null=True)
 
     hours_per_week = models.CharField(max_length=20, choices=HOURS_PER_WEEK_CHOICES, default='less_30')
     job_type = models.CharField(max_length=10, choices=JOB_TYPE_CHOICES, default='fixed')
@@ -70,10 +71,10 @@ class Project(models.Model):
     location_type = models.CharField(max_length=20, choices=LOCATION_TYPE_CHOICES, default='remote')
     client_location = models.CharField(max_length=200, blank=True, null=True)
 
-    # Payment fields
-    fixed_payment = models.IntegerField(null=True, blank=True)
-    hourly_min = models.IntegerField(null=True, blank=True)
-    hourly_max = models.IntegerField(null=True, blank=True)
+    # FIX: Changed payment fields to IntegerField
+    fixed_payment = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    hourly_min = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    hourly_max = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
 
     # Status and visibility
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')

@@ -28,7 +28,7 @@ export default function Workspace({ user }) {
         // DRF paginated response
         setWorkspaces(data.results);
       } else if (Array.isArray(data.workspaces)) {
-        // Custom wrapper like { workspaces: [...] }
+       
         setWorkspaces(data.workspaces);
       } else {
         console.error('Unexpected workspaces response:', data);

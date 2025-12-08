@@ -7,6 +7,8 @@ import { authAPI } from '../api/auth';
 import ImageCropper from '../components/ImageCropper';
 import CalendarInput from '../components/CalendarInput';
 import LocationSelectLite from '../components/LocationSelectLite';
+import { reviewsAPI } from '../api/reviews';
+
 
 export default function ClientProfile({ user, setUser }) {
   const [editing, setEditing] = useState(null);
@@ -33,6 +35,7 @@ export default function ClientProfile({ user, setUser }) {
     company_name: '',
     company_website: '',
   });
+  const [averageRating, setAverageRating] = useState(user?.rating_avg || 0);
 
   const sectionRefs = {
     basic: useRef(null),
@@ -55,6 +58,26 @@ export default function ClientProfile({ user, setUser }) {
       .catch(() => {});
     return () => { mounted = false; };
   }, []);
+
+    useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    reviewsAPI
+      .getStats(user.id)
+      .then((res) => {
+        if (cancelled) return;
+        const avg = res.data?.average_rating ?? 0;
+        setAverageRating(avg);
+      })
+      .catch((err) => {
+        console.error('Failed to load rating stats:', err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const onPickAvatar = (e) => {
     const f = e.target.files?.[0];
@@ -309,7 +332,7 @@ export default function ClientProfile({ user, setUser }) {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Average Rating</span>
                     <span className="font-bold text-yellow-600">
-                      {user?.rating_avg?.toFixed(1) || '0.0'}
+                      {Number(averageRating || 0).toFixed(1)}
                     </span>
                   </div>
 
@@ -708,7 +731,10 @@ export default function ClientProfile({ user, setUser }) {
                   <div className="text-sm text-gray-600 mt-1">Active Projects</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="text-3xl font-bold text-green-600">{user?.rating_avg?.toFixed(1) || '0.0'}</div>
+                <div className="text-3xl font-bold text-green-600">
+                  {Number(averageRating || 0).toFixed(1)}
+                </div>
+
                   <div className="text-sm text-gray-600 mt-1">Average Rating</div>
                 </div>
               </div>

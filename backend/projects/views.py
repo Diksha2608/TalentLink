@@ -146,12 +146,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Filter projects based on multiple criteria.
         Returns queryset of filtered projects.
         """
-
-        qs = Project.objects.filter(visibility='public')
-
-        qs = qs.annotate(num_proposals=Count('proposals'))
-
         params = self.request.query_params
+
+        #  FIX: Check if this is a "my_projects" request from dashboard
+        my_projects = params.get('my_projects', '').lower() == 'true'
+        
+        if my_projects and self.request.user and self.request.user.is_authenticated:
+            # Return ALL projects for this client (no visibility or status filter)
+            qs = Project.objects.filter(client=self.request.user)
+            qs = qs.annotate(num_proposals=Count('proposals'))
+            
+            print(f"\n✅ MY_PROJECTS MODE: Returning {qs.count()} projects for user {self.request.user.id}")
+            return qs
+
+        # Normal public listing (for browse page)
+        qs = Project.objects.filter(visibility='public')
+        qs = qs.annotate(num_proposals=Count('proposals'))
 
         # ==========================================
         # DEBUG LOGGING (remove in production)
@@ -232,7 +242,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             if "fixed" in job_types_list:
                 fixed_param = (
                     params.get("fixed_payment")
-                    or params.get("budget_range")  # fallback key
+                    or params.get("budget_range")
                     or ""
                 ).strip()
 
@@ -310,18 +320,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
             print(f"✓ Search filter '{search}': {qs.count()} projects")
 
         # ==========================================
-        # 7. CATEGORY FILTER (HIERARCHICAL - UPDATED)
+        # 7. CATEGORY FILTER (HIERARCHICAL)
         # ==========================================
         category = params.get("category", "").strip()
         if category:
-            # Check if this is an "All - ..." category
             if category in CATEGORY_GROUPS:
-                # Get all subcategories for this group
                 subcategories = CATEGORY_GROUPS[category]
                 qs = qs.filter(category__in=subcategories)
                 print(f"✓ Category group filter '{category}': searching in {len(subcategories)} subcategories: {qs.count()} projects")
             else:
-                # Specific subcategory - exact match
                 qs = qs.filter(category=category)
                 print(f"✓ Category filter '{category}': {qs.count()} projects")
 
@@ -366,8 +373,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='proposals', permission_classes=[IsAuthenticated])
     def proposals(self, request, pk=None):
         project = self.get_object()
-        # By default, return all proposals for this project.
-        # (Optional: restrict non-owners to their own proposals only.)
         qs = project.proposals.select_related('freelancer').all()
         ser = ProposalSerializer(qs, many=True, context={'request': request})
         return Response(ser.data)

@@ -41,9 +41,18 @@ class JobSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         job_type = attrs.get('job_type', getattr(self.instance, 'job_type', 'hourly'))
 
+        # FIX: Ensure integer conversion and validate
         if job_type == 'hourly':
             hourly_min = attrs.get('hourly_min', getattr(self.instance, 'hourly_min', None))
             hourly_max = attrs.get('hourly_max', getattr(self.instance, 'hourly_max', None))
+            
+            if hourly_min is not None:
+                hourly_min = int(hourly_min)
+                attrs['hourly_min'] = hourly_min
+            if hourly_max is not None:
+                hourly_max = int(hourly_max)
+                attrs['hourly_max'] = hourly_max
+                
             if not hourly_min or not hourly_max:
                 raise serializers.ValidationError({
                     'hourly_rate': 'Both minimum and maximum hourly rates are required for hourly jobs'
@@ -52,8 +61,13 @@ class JobSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'hourly_rate': 'Maximum hourly rate must be greater than minimum'
                 })
+                
         elif job_type == 'fixed':
             fixed_amount = attrs.get('fixed_amount', getattr(self.instance, 'fixed_amount', None))
+            if fixed_amount is not None:
+                fixed_amount = int(fixed_amount)
+                attrs['fixed_amount'] = fixed_amount
+                
             if not fixed_amount or fixed_amount <= 0:
                 raise serializers.ValidationError({
                     'fixed_amount': 'A valid fixed amount is required for fixed price jobs'
@@ -128,9 +142,14 @@ class JobApplicationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['freelancer', 'created_at', 'updated_at']
         extra_kwargs = {
-            # make estimated time optional so it can be omitted for ongoing roles
             'estimated_time': {'required': False, 'allow_blank': True}
         }
+
+    def validate(self, attrs):
+        #  FIX: Ensure integer conversion for bid_amount
+        if 'bid_amount' in attrs:
+            attrs['bid_amount'] = int(attrs['bid_amount'])
+        return attrs
 
     def get_client_name(self, obj):
         try:
@@ -139,20 +158,92 @@ class JobApplicationSerializer(serializers.ModelSerializer):
             return 'Unknown'
 
     def get_freelancer(self, obj):
+        """
+        Return complete freelancer details matching what FreelancerCard expects
+        """
         if not obj.freelancer:
             return None
 
         user = obj.freelancer
-        return {
+        request = self.context.get('request')
+        
+        # Get freelancer profile
+        try:
+            profile = user.freelancer_profile
+        except:
+            profile = None
+
+        # Build avatar URL
+        avatar_url = None
+        if hasattr(user, 'avatar') and user.avatar:
+            avatar_url = request.build_absolute_uri(user.avatar.url) if request else user.avatar.url
+
+        # Build freelancer data structure matching FreelancerCard expectations
+        freelancer_data = {
             'id': user.id,
-            'name': user.get_full_name(),
-            'avatar': user.avatar.url if getattr(user, 'avatar', None) else None,
-            'title': getattr(getattr(user, 'freelancer_profile', None), 'role_title', None),
-            'location': getattr(user, 'location', None),
-            'rating_avg': getattr(user, 'rating_avg', None),
-            'projects_completed': getattr(
-                getattr(user, 'freelancer_profile', None),
-                'projects_completed',
-                0
-            ),
+            'first_name': user.first_name or '',
+            'last_name': user.last_name or '',
+            'name': user.get_full_name() or user.username,
+            'email': user.email,
+            'avatar': avatar_url,
+            'bio': getattr(user, 'bio', ''),
+            'location': getattr(user, 'location', ''),
+            'rating_avg': getattr(user, 'rating_avg', 0.0),
+            'projects_completed': 0,
+            'hourly_rate': 0,
+            'availability': None,
+            'skills': [],
+            'portfolio': '',
+            'portfolio_files': [],
+            'role_title': '',
+            'social_links': {},
+            'languages': [],
+            'experiences': [],
+            'education': [],
+            'total_earnings': 0,
         }
+
+        # Add profile data if available
+        if profile:
+            freelancer_data.update({
+                'projects_completed': getattr(profile, 'projects_completed', 0),
+                'hourly_rate': float(getattr(profile, 'hourly_rate', 0)),
+                'availability': getattr(profile, 'availability', None),
+                'portfolio': getattr(profile, 'portfolio', ''),
+                'role_title': getattr(profile, 'role_title', ''),
+                'social_links': getattr(profile, 'social_links', {}),
+                'languages': getattr(profile, 'languages', []),
+                'experiences': getattr(profile, 'experiences', []),
+                'education': getattr(profile, 'education', []),
+                'total_earnings': float(getattr(profile, 'total_earnings', 0)),
+            })
+
+            # Get skills
+            skills = []
+            try:
+                for skill in profile.skills.all():
+                    skills.append({
+                        'id': skill.id,
+                        'name': skill.name,
+                    })
+            except:
+                pass
+            freelancer_data['skills'] = skills
+
+            # Get portfolio files
+            portfolio_files = []
+            try:
+                for pf in profile.portfolio_files.all():
+                    file_url = request.build_absolute_uri(pf.file.url) if request and pf.file else None
+                    portfolio_files.append({
+                        'id': pf.id,
+                        'file_name': pf.file_name,
+                        'file_size': pf.file_size,
+                        'file_url': file_url,
+                        'file': file_url,
+                    })
+            except:
+                pass
+            freelancer_data['portfolio_files'] = portfolio_files
+
+        return freelancer_data

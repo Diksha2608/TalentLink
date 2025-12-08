@@ -27,7 +27,7 @@ export default function EditJob({ user }) {
 
   useEffect(() => {
     loadJob();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [id]);
 
   const loadJob = async () => {
@@ -81,7 +81,6 @@ export default function EditJob({ user }) {
     setError('');
     setSubmitting(true);
 
-    // Same validation as PostJob.jsx
     if (formData.job_type === 'hourly') {
       if (!formData.hourly_min || !formData.hourly_max) {
         setError('Please enter hourly rate range');
