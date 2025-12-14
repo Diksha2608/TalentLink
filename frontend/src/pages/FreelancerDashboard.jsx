@@ -140,9 +140,13 @@ export default function FreelancerDashboard({ user }) {
           const totalEarnings = allPayments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
           
           // Calculate pending earnings from active workspaces
+          // Calculate pending earnings from all workspaces with unpaid amounts
           const pendingEarnings = workspacesData
-            .filter(ws => ws.contract_status === 'active')
-            .reduce((sum, ws) => sum + (ws.remaining_amount || 0), 0);
+            .reduce((sum, ws) => {
+              const remaining = parseFloat(ws.remaining_amount) || 0;
+              // Only add if there's actually money remaining
+              return sum + (remaining > 0 ? remaining : 0);
+            }, 0);
 
           const completedProjects = workspacesData.filter(ws => ws.is_fully_completed).length;
           const activeProjects = workspacesData.filter(ws => ws.contract_status === 'active').length;
@@ -320,7 +324,7 @@ export default function FreelancerDashboard({ user }) {
             icon={Clock}
             color="orange"
             isCurrency
-            subtitle="From active projects"
+            subtitle="Unpaid amounts"
           />
           <DashboardCard
             title="Active Projects"

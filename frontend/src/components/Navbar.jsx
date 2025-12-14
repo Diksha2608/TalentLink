@@ -496,12 +496,12 @@ export default function Navbar({ user, setUser, loading }) {
               </div>
             ) : (
               <div className="hidden md:flex items-center gap-3">
-                <Link
+                {/* <Link
                   to="/projects"
                   className="text-sm font-medium text-gray-700 hover:text-purple-600 transition no-underline"
                 >
                   Browse Projects
-                </Link>
+                </Link> */}
                 <Link
                   to="/signin"
                   className="text-sm font-medium text-gray-700 hover:text-purple-600 transition no-underline"
